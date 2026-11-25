@@ -61,7 +61,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 2. 浏览器打开 `http://<电脑局域网IP>:8787`（装完 `install.cmd` 会直接打印地址）
 3. Android Chrome：右上角 **⋮** →「添加到主屏幕」；iPhone Safari：分享 →「添加到主屏幕」
 
-加完之后就是一张全屏图标，点开和 App 一样（页面带 `manifest.webmanifest`，所以是独立窗口而不是浏览器标签）。
+加完之后就多一张图标，点开即用。iPhone 上会全屏独立显示；Android Chrome 走的是 http，通常只提供「创建快捷方式」，点开会带一条浏览器地址栏——功能一样，不影响用。
 手机打不开，多半是防火墙或校园网隔离：右键「以管理员身份运行」`app\allow-lan.cmd` 放行 8787 端口。
 
 ## 目录结构
