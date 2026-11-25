@@ -1,2 +1,13 @@
 * text=auto
 *.png binary
+*.ico binary
+
+# Windows 脚本保持 CRLF，node/网页产物保持 LF，避免每次提交都刷 warning
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+*.mjs text eol=lf
+*.json text eol=lf
+*.webmanifest text eol=lf
+*.md text eol=lf
+docs/index.html text eol=lf

@@ -36,25 +36,28 @@ if ($LASTEXITCODE -ne 0) { throw "生成失败（退出码 $LASTEXITCODE）。" 
 
 Step 3 '提交并推送…'
 Push-Location $Root
+$eap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'   # git 的进度/行尾提示走 stderr，这里当普通输出处理
 try {
-  & git add -A
+  & git add -A 2>&1 | Out-Null
   $staged = (& git diff --cached --name-only) -join ''
   if (-not $staged) {
     Write-Host '  没有变化，不需要推送。' -ForegroundColor DarkGray
     return
   }
   if (-not $Message) { $Message = '更新看板数据 ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') }
-  & git commit -q -m $Message
+  & git commit -q -m $Message 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'git commit 失败（检查仓库状态）。' }
 
-  # 用 cmd 跑，避免 git 往 stderr 写进度时被 PowerShell 当成错误刷屏
-  & cmd /c 'git push origin main 2>nul'
+  & git push origin main 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  直连推送失败，改用本机代理重试…' -ForegroundColor Yellow
-    & cmd /c "git -c http.proxy=$Proxy push origin main 2>nul"
+    & git -c "http.proxy=$Proxy" push origin main 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw '推送失败：直连和代理都不行，检查网络后重跑本脚本（页面已经生成好了）。' }
   }
   Write-Host '  推送完成。' -ForegroundColor Green
 } finally {
+  $ErrorActionPreference = $eap
   Pop-Location
 }
 
