@@ -128,3 +128,46 @@ export function buildData(dataDir) {
     items,
   };
 }
+
+// 把「n. 底，底部；尽头，远端；最低水平…」压成适合做选项的短释义
+export function shortenGloss(raw) {
+  if (!raw) return '';
+  const text = String(raw).trim();
+  const posMatch = text.match(/^([a-z]+\.)\s*/i);
+  const pos = posMatch ? posMatch[1] + ' ' : '';
+  const body = posMatch ? text.slice(posMatch[0].length) : text;
+  const first = body.split('；').map((s) => s.trim()).filter(Boolean)[0] || '';
+  let out = first;
+  if (out.length > 26) {
+    const segs = out.split('，');
+    out = segs[0];
+    for (let i = 1; i < segs.length && (out + '，' + segs[i]).length <= 26; i++) out += '，' + segs[i];
+  }
+  out = out.replace(/[（(][^）)]*[）)]/g, '').trim() || out;
+  return (pos + out).slice(0, 30).trim();
+}
+
+// 每日测验的词库：词 + 中文释义 + 难度分（墨墨 API 不给释义，用 quiz/glosses.json 补）
+export function buildQuizPool(dataDir) {
+  const data = buildData(dataDir);
+  if (!data.ok) return data;
+  let glosses = {};
+  try {
+    glosses = JSON.parse(fs.readFileSync(path.join(dataDir, 'quiz', 'glosses.json'), 'utf8'));
+  } catch {
+    glosses = {};
+  }
+  const pool = [];
+  for (const it of data.items) {
+    const cn = shortenGloss(glosses[it.w]);
+    if (!cn) continue;
+    pool.push({ w: it.w, cn, s: it.score, sc: it.sc, lr: it.lr, ns: it.ns, dueIn: it.dueIn });
+  }
+  return {
+    ok: true,
+    updatedAt: data.updatedAt,
+    count: pool.length,
+    missing: data.items.length - pool.length,
+    pool,
+  };
+}

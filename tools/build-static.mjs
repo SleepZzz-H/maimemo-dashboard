@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildData } from '../app/model.mjs';
+import { buildData, buildQuizPool } from '../app/model.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -44,6 +44,28 @@ const withData = html
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'index.html'), withData, 'utf8');
 
+// 每日测验页：词库（词 + 中文释义 + 难度分）内联进去，离线也能做题
+const quizPool = buildQuizPool(DATA_DIR);
+if (!quizPool.ok) {
+  console.error('测验页生成失败：' + (quizPool.error || '未知错误'));
+  process.exit(1);
+}
+const quizHtml = fs.readFileSync(path.join(APP, 'quiz.html'), 'utf8');
+const quizMarker = '<script>\nconst $ = (id)';
+if (!quizHtml.includes(quizMarker)) {
+  console.error('app/quiz.html 的结构变了：找不到主脚本开头。');
+  process.exit(1);
+}
+const poolPayload = JSON.stringify({ updatedAt: quizPool.updatedAt, count: quizPool.count, pool: quizPool.pool })
+  .replace(/</g, '\\u003c');
+fs.writeFileSync(
+  path.join(OUT, 'quiz.html'),
+  quizHtml
+    .replace(quizMarker, `<script>window.__QUIZ_POOL__ = ${poolPayload};</script>\n${quizMarker}`)
+    .replace('<meta name="viewport"', '<meta name="robots" content="noindex, nofollow" />\n<meta name="viewport"'),
+  'utf8'
+);
+
 // 图标与清单：所有路径改成相对路径，放在 /<repo>/ 子路径下也能用
 fs.cpSync(path.join(APP, 'icons'), path.join(OUT, 'icons'), { recursive: true });
 fs.copyFileSync(path.join(APP, 'favicon.ico'), path.join(OUT, 'favicon.ico'));
@@ -60,3 +82,7 @@ const size = fs.statSync(path.join(OUT, 'index.html')).size;
 console.log(`静态版已生成：${path.join(OUT, 'index.html')}（${kb(size)}）`);
 console.log(`收录 ${data.totals.words} 个词 · 更新于 ${data.updatedAt || data.generatedAt}`);
 console.log(`事件 ${data.eventCount} 条（模糊 ${data.totals.vague} / 忘记 ${data.totals.forget}）`);
+console.log(
+  `测验页：${path.join(OUT, 'quiz.html')}（${kb(fs.statSync(path.join(OUT, 'quiz.html')).size)}，` +
+    `词库 ${quizPool.count} 个词${quizPool.missing ? `，缺释义 ${quizPool.missing}` : ''}）`
+);

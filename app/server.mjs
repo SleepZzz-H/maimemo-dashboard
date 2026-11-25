@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { buildData } from './model.mjs';
+import { buildData, buildQuizPool } from './model.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(__dirname, '..');
@@ -15,6 +15,8 @@ const STATIC = {
   '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
   '/favicon.ico': ['icons/favicon.ico', 'image/x-icon'],
   '/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png'],
+  '/quiz.html': ['quiz.html', 'text/html; charset=utf-8'],
+  '/quiz': ['quiz.html', 'text/html; charset=utf-8'],
 };
 
 function lanAddresses() {
@@ -92,6 +94,9 @@ const server = http.createServer((req, res) => {
     }
     if (url.pathname === '/api/data') {
       return json(200, buildData(DATA_DIR));
+    }
+    if (url.pathname === '/api/quiz') {
+      return json(200, buildQuizPool(DATA_DIR));
     }
     if (url.pathname === '/api/sync' && req.method === 'POST') {
       const started = startSync();

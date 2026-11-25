@@ -35,6 +35,9 @@
   button.primary { background: linear-gradient(180deg,#3f5bd8,#3348b8); border-color: #3a51c9; }
   button[disabled] { opacity: .55; cursor: default; }
   button.ghost { background: transparent; border-color: var(--line); color: var(--dim); padding: 9px 11px; }
+  a.linkbtn { display: inline-flex; align-items: center; text-decoration: none; border: 1px solid var(--line);
+    border-radius: 10px; font-size: 14px; color: var(--dim); background: transparent; padding: 9px 12px; }
+  a.linkbtn:hover { color: var(--text); border-color: #37405a; }
   .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: flex-end; justify-content: center;
     background: rgba(0,0,0,.62); }
   .modal.on { display: flex; }
@@ -102,6 +105,7 @@
   <div class="bar">
     <div class="title">墨墨难词看板<span id="syncAt">加载中…</span></div>
     <div class="spacer"></div>
+    <a id="btnQuiz" class="ghost linkbtn" href="quiz.html" title="每天 50 个词，四选一测验">测验</a>
     <button id="btnSync" class="primary">同步墨墨</button>
     <button id="btnInstall" class="ghost" title="怎么变成桌面/主屏图标">图标</button>
   </div>

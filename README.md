@@ -44,6 +44,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1
 - **搜索 / 筛选 / 排序**：顽固、模糊过、忘记过、今天该复习、复习少；按难度分 / 模糊 / 忘记 / 复习次数 / 到期时间 / 字母
 - **一键同步**：点按钮后台跑一次快照，完成后自动刷新
 - **手机适配**：响应式布局，同一 Wi-Fi 下手机直接开
+- **每日 50 词测验**：四选一，英→中或中→英；错词单独列出，可以只练错词
 
 ## 快速开始
 
@@ -83,6 +84,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 加完之后就多一张图标，点开即用。iPhone 上会全屏独立显示；Android Chrome 走的是 http，通常只提供「创建快捷方式」，点开会带一条浏览器地址栏——功能一样，不影响用。
 手机打不开，多半是防火墙或校园网隔离：右键「以管理员身份运行」`app\allow-lan.cmd` 放行 8787 端口。
 
+## 每日 50 词测验
+
+点看板右上角的 **测验**，或者直接开 `/quiz.html`。
+
+- **每天 50 个词**，0 点自动换新的一组；同一天刷新还是同一组，进度存在浏览器本地
+- **两种方向**：英→中、中→英，也可以选「混合方向」随机穿插
+- **选词规则**：30% 今天该复习的（`next_study_date` 已到期）+ 50% 难度分最高的那批 + 剩下的随机补，既练难词又不至于一辈子只练同几十个词
+- **答错立刻给答案**：正确项标绿、错误项标红，下面直接显示「单词 = 释义」
+- **结束页**：正确率、用时、错词清单；错词 ≥ 4 个时可以「只练错词」
+- 键盘 `1`–`4` 选答案，`Enter` 下一题
+
+一个先说清楚的地方：**墨墨开放 API 不返回词典释义**。`interpretation` 接口给的是「你自己添加的释义」，实测 1839 个词全是空的。所以中文释义是构建时用有道词典的公开接口（`dict.youdao.com/jsonapi`）抓下来缓存到 `quiz/glosses.json` 的，脚本在 `tools/fetch-glosses.mjs`，抓完 1839 个词约 10 分钟。要刷新释义重新跑一遍就行，已抓过的会跳过。
+
 ## 目录结构
 
 ```
@@ -93,6 +107,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 ├── app/
 │   ├── server.mjs        # 零依赖 Node 服务：/api/data、/api/sync、/api/health、/api/lan
 │   ├── index.html        # 单页界面（内联 CSS/JS，无外部依赖）
+│   ├── quiz.html         # 每日 50 词测验页
+│   ├── model.mjs         # 数据聚合 + 难度分 + 测验词库（服务端和静态版共用）
 │   ├── manifest.webmanifest
 │   ├── icons/            # 16–256 px 的 ico + 各尺寸 png（PWA / 桌面图标共用）
 │   ├── open-dashboard.ps1# 起服务 + 开浏览器（无窗口）
@@ -103,9 +119,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 │   └── allow-lan.cmd     # 需要时放行 8787 端口（要管理员）
 ├── tools/
 │   ├── make-icons.ps1    # 重新生成图标
-│   └── build-static.mjs  # 生成静态版（docs/，给 GitHub Pages 用）
+│   ├── fetch-glosses.mjs # 抓中文释义到 quiz/glosses.json（有道公开接口）
+│   ├── build-static.mjs  # 生成静态版（docs/，给 GitHub Pages 用）
+│   └── publish.ps1       # 快照 → 生成静态版 → 提交推送
 ├── docs/                 # 静态版产物，GitHub Pages 从这里发布
-│   └── index.html        # 数据内联的单页，可以单独发给别人
+│   ├── index.html        # 数据内联的单页，可以单独发给别人
+│   └── quiz.html         # 测验页，词库也内联，打开就能做题
 ├── notes/
 │   └── maimemo-api-notes.md
 ├── state.json            # 运行时生成，不进仓库

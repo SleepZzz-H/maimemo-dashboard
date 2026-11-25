@@ -37,6 +37,8 @@ Token 按优先级取：
 
 全局选项：`-O json|column`、`--no-color`、`-H/--no-header`、`--fields`、`-T/--token`、`--verbose`、`-f`（跳过确认）。支持 stdin 传 JSON 请求体。
 
+**没有词典接口。** `voc get` 只给 `id` + `spelling`；`interp list` 只返回用户自己创建的释义（实测 1839 个词全部为空），`phrase` 同理。想要中文意思只能自己准备：本项目在构建时用有道公开接口（`https://dict.youdao.com/jsonapi?q=word`，取 `ec.word[0].trs[].tr[].l.i[0]`）抓一份，缓存到 `quiz/glosses.json`，脚本 `tools/fetch-glosses.mjs`。
+
 ## JSON 信封键
 
 | 命令 | 顶层键 |
