@@ -10,3 +10,4 @@ node_modules/
 *.log
 preview*.png
 .edge-shot/site/_shot*.png
+site/_shot*.png
