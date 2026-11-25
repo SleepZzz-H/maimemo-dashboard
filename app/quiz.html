@@ -79,6 +79,7 @@
   .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: flex-end; justify-content: center;
     background: rgba(0,0,0,.62); padding: 0; }
   .modal.on { display: flex; }
+  #memoModal { z-index: 70; }
   .sheet { width: 100%; max-width: 520px; background: var(--panel2); border: 1px solid var(--line);
     border-radius: 16px 16px 0 0; padding: 18px 18px 22px; max-height: 88vh; overflow: auto; }
   @media (min-width: 640px) { .modal { align-items: center; } .sheet { border-radius: 16px; } }
@@ -986,15 +987,23 @@ function resetToday() {
 
 // —— 绑定墨墨账号的界面 ——
 function openMemo() {
+  $('accModal').classList.remove('on');   // 账号面板先收起来，否则它压在绑定弹窗上面
   $('memoErr').textContent = '';
   if (MEMO && MEMO.token) $('memoToken').value = MEMO.token;
   $('memoModal').classList.add('on');
   setTimeout(() => $('memoToken').focus(), 50);
 }
+function closeMemo(back) {
+  $('memoModal').classList.remove('on');
+  if (back !== false && window.Cloud && Cloud.configured()) {
+    paintAccount();
+    $('accModal').classList.add('on');
+  }
+}
 $('btnMemoBind').addEventListener('click', openMemo);
 $('btnMemoSync').addEventListener('click', openMemo);
-$('btnCloseMemo').addEventListener('click', () => $('memoModal').classList.remove('on'));
-$('memoModal').addEventListener('click', (e) => { if (e.target.id === 'memoModal') $('memoModal').classList.remove('on'); });
+$('btnCloseMemo').addEventListener('click', () => closeMemo());
+$('memoModal').addEventListener('click', (e) => { if (e.target.id === 'memoModal') closeMemo(); });
 
 $('btnMemoGo').addEventListener('click', async () => {
   const t = ($('memoToken').value || '').trim();
@@ -1003,7 +1012,7 @@ $('btnMemoGo').addEventListener('click', async () => {
   $('btnMemoGo').textContent = '同步中…';
   try {
     const n = await syncMemo(t);
-    $('memoModal').classList.remove('on');
+    closeMemo();
     toast(`已绑定，拿到 ${n} 个词`);
     resetToday();
     await makeToday();
