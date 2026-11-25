@@ -86,3 +86,90 @@
   Anki 牌组同理（很多牌组本身是侵权转的）。
 - **数据准确性**：导入的词表没有历史，只能按"复习次数"估难度，和墨墨快照那套不是一个精度，
   UI 上要分开说明，不要混着排名。
+
+## 六、怎么拿到「容易忘」的数据（按可得性排序）
+
+要算"最容易忘"，需要的是**每次回答的结果**，不是词表。各家给的东西差得很远：
+
+### 1. WaniKani：能拿到逐条，且浏览器直连
+
+| 端点 | 拿到什么 |
+|---|---|
+| `GET /v2/review_statistics` | 每个词的累计 `meaning_correct` / `meaning_incorrect` / `reading_correct` / `reading_incorrect` |
+| `GET /v2/reviews` | 每一条复习事件：何时、`starting_srs_stage` → `ending_srs_stage`、答错几次 |
+| `GET /v2/assignments` | 当前 SRS 阶段、下次可用时间；`burned_at` 表示已烧（永不复习） |
+
+难度可以两种方式算：
+
+- 错误率 = `incorrect / (correct + incorrect)`
+- SRS 降级次数：`ending_srs_stage < starting_srs_stage` 的那次就是答错了（这个更贴近"忘了"）
+
+只读、Token 放浏览器就行、60 次/分钟、分页 500。
+
+### 2. Anki：能拿到逐条，但只能在本机
+
+Anki 的 `collection.anki2` 就是 SQLite，`revlog` 表存着每一次回答：
+
+```
+revlog(id, cid, usn, ease, ivl, lastIvl, factor, time, type)
+```
+
+- `ease`：1=Again 2=Hard 3=Good 4=Easy（1 就是"忘了"）
+- `type`：0=学习 1=复习 2=重学 3=筛选 4=手动 5=重新排期
+- `time`：这次答题花了多少毫秒
+
+一条 SQL 就能排出来：
+
+```sql
+SELECT n.flds,
+       COUNT(*) AS reviews,
+       SUM(r.ease = 1) AS forgot,
+       ROUND(1.0 * SUM(r.ease = 1) / COUNT(*), 2) AS forget_rate
+FROM revlog r
+JOIN cards c ON c.id = r.cid
+JOIN notes n ON n.id = c.nid
+GROUP BY n.id
+HAVING reviews >= 3
+ORDER BY forget_rate DESC, forgot DESC
+LIMIT 50;
+```
+
+注意三点：
+
+- Anki **必须关掉**再读，或者先复制一份库文件（它 WAL 锁着）；
+- 新版库文件名可能是 `collection.anki21` / `.anki21b`，先看目录；
+- 导出的"笔记纯文本"**不含 revlog**，所以想算错误率只能读库或用插件。
+
+插件路线：AnkiConnect（addon id 2055492159）开在 `127.0.0.1:8765`，有 `getReviewsOfCards`、
+`getCardInfo`、`findCards "prop:ivl<21"`。好处是 Anki 不用关；坏处是**只在本机**，网页版碰不到它。
+
+### 3. 墨墨：只有聚合值，得自己攒
+
+`study_count` + `last_response` + `sticky`，没有逐次历史 —— 我们现在的每日快照差分就是补这个。
+局限：一天复习好几轮，只能看到最后一轮的结论。
+
+### 4. 没有开放接口的那些（百词斩 / 不背单词 / 扇贝 / 知米 / 沪江 / 乐词）
+
+按可行性从高到低：
+
+| 办法 | 能拿到 | 门槛 | 风险 |
+|---|---|---|---|
+| **官方导出** | 一般只有词表/生词本，**没有错误历史** | 无 | 无 |
+| **个人信息查阅复制请求** | 有可能拿到导出包（含学习记录） | 要发工单、等几天 | 《个人信息保护法》第 45 条有依据，但多数 App 会拖或只给粗略 CSV |
+| **安卓无障碍 / UI 自动化**（Auto.js、Appium、`adb shell uiautomator dump`） | 你屏幕上能看到的一切：题目、你的选择、对错 | 一台安卓机 + 装工具，**不用 root** | 只适合自己设备、自己账号；速度慢；App 改版就要修 |
+| **抓包**（mitmproxy/Charles + 装证书） | 接口里的原始字段，最全 | 安卓 7+ 默认不信用户证书，要 root 或改包；常有证书固定 | **违反用户协议**，App 一升级就断，不建议 |
+| **截图 OCR** | 错题页上的词 | 简单，但要人工核对 | 量大了很痛苦 |
+
+现实结论：这些 App 里"错题本/遗忘曲线"通常是**只给看不给导**的功能。想让数据出来，
+要么走工单要导出，要么在自己设备上自动化"边背边记"。
+
+### 5. 最可靠的一条：把本站测验当采集器
+
+不管词从哪来（墨墨、Anki、Quizlet、手输），**在本站做一遍题**，对错就是我们自己的数据：
+
+- 每题都有记录：对/错、用时、日期；
+- 精度比任何聚合值都高（能区分"想了 20 秒才蒙对"和"秒答"）；
+- 不依赖别人的接口是否还活着。
+
+如果目标是"统一管理所有平台的易忘词"，这条路才是终局：别人的数据只用来**导词**，
+遗忘判断交给自己的答题记录。想更快攒数据，可以一天多刷几组（每 50 词一组，题库够大就不重复）。
