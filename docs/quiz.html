@@ -170,13 +170,23 @@
 <div class="modal" id="accModal">
   <div class="sheet">
     <h3>账号</h3>
-    <p class="hintline" id="accWho"></p>
-    <p class="tiny" id="accSync"></p>
-    <div class="authrow">
-      <button type="button" id="btnSyncNow">立即同步</button>
-      <button type="button" id="btnSignOut">退出登录</button>
-      <span class="grow"></span>
-      <button type="button" class="ghost" id="btnCloseAcc">关闭</button>
+    <div id="accBody">
+      <p class="hintline" id="accWho"></p>
+      <p class="tiny" id="accSync"></p>
+      <div class="authrow">
+        <button type="button" id="btnSyncNow">立即同步</button>
+        <button type="button" id="btnSignOut">退出登录</button>
+        <span class="grow"></span>
+        <button type="button" class="ghost" id="btnCloseAcc">关闭</button>
+      </div>
+    </div>
+    <div id="accGuest">
+      <p class="tiny">没登录：答题进度只存在这台设备上，换手机、换电脑都看不到。用邮箱注册一个账号（不绑定手机号），进度就存到云上，走到哪接着做。</p>
+      <div class="authrow">
+        <button type="button" class="primary" id="btnGoAuth">登录 / 注册</button>
+        <span class="grow"></span>
+        <button type="button" class="ghost" id="btnCloseAcc2">关闭</button>
+      </div>
     </div>
 
     <div class="memosep"></div>
@@ -354,6 +364,8 @@ function paintAccount() {
   if (!window.Cloud || !Cloud.configured()) { btn.hidden = true; return; }
   btn.hidden = false;
   btn.textContent = ACCOUNT ? shortName(ACCOUNT.email) : '登录同步';
+  $('accBody').hidden = !ACCOUNT;
+  $('accGuest').hidden = !!ACCOUNT;
   $('accWho').textContent = ACCOUNT ? ACCOUNT.email : '';
   paintSync();
 }
@@ -861,9 +873,15 @@ function syncAuthUI() {
 
 $('btnAccount').addEventListener('click', () => {
   if (!window.Cloud || !Cloud.configured()) return;
-  if (ACCOUNT) { paintAccount(); $('accModal').classList.add('on'); }
-  else { syncAuthUI(); openAuth('login'); }
+  paintAccount();
+  $('accModal').classList.add('on');
 });
+$('btnGoAuth').addEventListener('click', () => {
+  $('accModal').classList.remove('on');
+  syncAuthUI();
+  openAuth('login');
+});
+$('btnCloseAcc2').addEventListener('click', () => $('accModal').classList.remove('on'));
 $('btnSwitch').addEventListener('click', () => { authMode = authMode === 'login' ? 'signup' : 'login'; syncAuthUI(); });
 $('btnCloseAuth').addEventListener('click', () => $('authModal').classList.remove('on'));
 $('btnCloseAcc').addEventListener('click', () => $('accModal').classList.remove('on'));
