@@ -88,8 +88,15 @@ Write-Host '  电脑：双击桌面「墨墨难词看板」图标，或者开始
 Write-Host '  手机：和电脑连同一个 Wi-Fi，浏览器打开 http://<电脑局域网IP>:8787' -ForegroundColor Gray
 Write-Host '        然后在 Chrome 菜单里「添加到主屏幕」/ Safari 分享里「添加到主屏幕」。' -ForegroundColor Gray
 
+$upAliases = @()
+try {
+  $upAliases = @(Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' } | Select-Object -ExpandProperty InterfaceAlias)
+} catch { }
 $lan = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.PrefixOrigin -ne 'WellKnown' }
+  Where-Object {
+    $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
+    ($upAliases.Count -eq 0 -or $upAliases -contains $_.InterfaceAlias)
+  }
 if ($lan) {
   Write-Host '  本机地址：' -ForegroundColor Gray
   foreach ($a in $lan) { Write-Host ('        http://' + $a.IPAddress + ':8787   (' + $a.InterfaceAlias + ')') -ForegroundColor Gray }
