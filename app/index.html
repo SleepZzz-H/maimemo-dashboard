@@ -90,8 +90,17 @@
   footer { max-width: 880px; margin: 22px auto 0; padding: 0 16px; color: #5f6779; font-size: 11.5px; line-height: 1.7; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #2a3143;
     border: 1px solid #3b455c; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px;
-    opacity: 0; pointer-events: none; transition: .25s; max-width: 88vw; text-align: center; }
+    opacity: 0; pointer-events: none; transition: .25s; max-width: 88vw; text-align: center; z-index: 80; }
   .toast.show { opacity: 1; }
+  .modal.top { z-index: 70; }
+  .sheet .tip { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
+  .field { margin-bottom: 10px; }
+  .field input { width: 100%; }
+  .autherr { color: var(--bad); font-size: 12.5px; min-height: 16px; margin: 2px 0 10px; }
+  .authrow { display: flex; gap: 8px; }
+  .authrow .grow { flex: 1; }
+  .cn { color: var(--dim); font-size: 13px; line-height: 1.5; margin-top: 5px; }
+  .more { color: var(--dim); font-size: 12.5px; text-align: center; padding: 14px 6px 4px; }
   @media (max-width: 520px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
     .title { font-size: 15px; }
@@ -106,6 +115,7 @@
     <div class="title">墨墨难词看板<span id="syncAt">加载中…</span></div>
     <div class="spacer"></div>
     <a id="btnQuiz" class="ghost linkbtn" href="quiz.html" title="每天 50 个词，四选一测验">测验</a>
+    <button id="btnAccount" class="ghost">登录</button>
     <button id="btnSync" class="primary">同步墨墨</button>
     <button id="btnInstall" class="ghost" title="怎么变成桌面/主屏图标">图标</button>
   </div>
@@ -175,11 +185,43 @@
   </div>
 </div>
 
+<div class="modal top" id="authModal">
+  <div class="sheet">
+    <h3 id="authTitle">登录</h3>
+    <p class="tip">登录后做题进度存在云端，手机和电脑共用一份。这里登录过，测验页会自动是同一账号。</p>
+    <div class="field"><input id="email" type="email" placeholder="邮箱" autocomplete="username" inputmode="email" /></div>
+    <div class="field"><input id="pwd" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" /></div>
+    <div class="autherr" id="authErr"></div>
+    <div class="authrow">
+      <button class="primary grow" id="btnAuthGo">登录</button>
+      <button class="ghost" id="btnAuthSwitch">去注册</button>
+    </div>
+    <button class="close ghost" id="btnAuthClose">关闭</button>
+  </div>
+</div>
+
+<div class="modal top" id="accModal">
+  <div class="sheet">
+    <h3>账号</h3>
+    <p class="tip" id="accWho">—</p>
+    <div class="authrow">
+      <a class="ghost linkbtn grow" href="quiz.html" id="btnGoQuiz">去测验</a>
+      <button class="ghost" id="btnSignOut">退出登录</button>
+    </div>
+    <button class="close" id="btnAccClose">关闭</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="cloud.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const STATIC = !!window.__STATIC_DATA__;   // 静态版：数据内联，没有后端
 let DATA = null;
 let filter = 'all';
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const fmtDate = (iso) => {
   if (!iso) return '—';
@@ -273,6 +315,7 @@ function render() {
       <div class="rank">${i + 1}</div>
       <div class="body">
         <div class="word">${it.w}<span class="badges">${badges.join('')}</span></div>
+        ${it.cn ? `<div class="cn">${esc(it.cn)}</div>` : ''}
         <div class="meta">
           <span>复习 <span class="hi">${it.sc}</span> 次</span>
           <span>下次 ${fmtDate(it.ns)}（${dueText(it.ns)}）</span>
@@ -283,6 +326,11 @@ function render() {
       <div class="score"><b>${it.score}</b><span>难度分</span></div>
     </div>`;
   }).join('');
+
+  if (rows.length > 300) {
+    $('list').insertAdjacentHTML('beforeend',
+      `<div class="more">只显示前 300 条（共 ${rows.length} 条），用搜索或上面的筛选缩小范围</div>`);
+  }
 
   $('empty').hidden = rows.length > 0;
   if (!rows.length) $('empty').textContent = '没有符合条件的单词';
@@ -310,14 +358,17 @@ async function doSync() {
   try {
     const r = await fetch('/api/sync', { method: 'POST' });
     if (r.status === 409) toast('已经有一个同步在跑');
+    let done = false;
     for (let i = 0; i < 200; i++) {
       await new Promise((res) => setTimeout(res, 1200));
       const s = await (await fetch('/api/sync')).json();
       if (!s.running) {
         toast(s.message || (s.ok ? '同步完成' : '同步失败'));
+        done = true;
         break;
       }
     }
+    if (!done) toast('同步还没跑完（超过 4 分钟），稍后刷新看看结果');
     await load();
   } catch (e) {
     toast('同步失败：' + e.message);
@@ -383,6 +434,130 @@ $('chips').addEventListener('click', (e) => {
   filter = chip.dataset.f;
   render();
 });
+
+// —— 账号（登录后和测验页共用同一份 session）——
+const CLOUD = window.Cloud || null;
+const CLOUD_ON = !!(CLOUD && CLOUD.configured && CLOUD.configured());
+let ACCOUNT = (CLOUD_ON && CLOUD.user()) || null;
+let authMode = 'login';
+
+function zhErr(m) {
+  const s = String(m || '');
+  if (/Invalid login credentials/i.test(s)) return '邮箱或密码不对';
+  if (/User already registered/i.test(s)) return '这个邮箱注册过了，直接登录';
+  if (/Email not confirmed/i.test(s)) return '邮箱还没确认：点邮件里的链接，或先在测验页用验证码确认';
+  if (/rate limit/i.test(s)) return '邮件发得太频繁了，过一会儿再试';
+  if (/at least 6 characters/i.test(s)) return '密码至少 6 位';
+  if (/Unable to validate email/i.test(s)) return '邮箱格式不对';
+  if (/Failed to fetch|Load failed|NetworkError/i.test(s)) return '连不上云端：检查网络或 config.js 里的地址';
+  return s || '出错了，再试一次';
+}
+
+function shortName(email) {
+  const s = String(email || '');
+  const at = s.indexOf('@');
+  const name = at > 0 ? s.slice(0, at) : s;
+  return name.length > 10 ? name.slice(0, 10) + '…' : name;
+}
+
+function paintAccount() {
+  const btn = $('btnAccount');
+  if (!CLOUD_ON) {
+    btn.textContent = '登录';
+    btn.title = '还没配置云端（app/config.js 是空的）';
+    return;
+  }
+  if (ACCOUNT && ACCOUNT.email) {
+    btn.textContent = shortName(ACCOUNT.email);
+    btn.title = ACCOUNT.email + '（点开看账号）';
+  } else {
+    btn.textContent = '登录';
+    btn.title = '登录后做题进度存云端';
+  }
+}
+
+function openAuth(mode) {
+  authMode = mode || 'login';
+  $('authErr').textContent = '';
+  $('authTitle').textContent = authMode === 'login' ? '登录' : '注册';
+  $('btnAuthGo').textContent = authMode === 'login' ? '登录' : '注册';
+  $('btnAuthSwitch').textContent = authMode === 'login' ? '去注册' : '去登录';
+  $('authModal').classList.add('on');
+  setTimeout(() => $('email').focus(), 60);
+}
+
+function closeAuth() { $('authModal').classList.remove('on'); }
+
+async function submitAuth() {
+  const email = $('email').value.trim();
+  const pwd = $('pwd').value;
+  const err = $('authErr');
+  err.textContent = '';
+  if (!email || !pwd) { err.textContent = '邮箱和密码都要填'; return; }
+  const go = $('btnAuthGo');
+  go.disabled = true;
+  const label = go.textContent;
+  go.textContent = '请稍候…';
+  try {
+    if (authMode === 'login') await CLOUD.signIn(email, pwd);
+    else {
+      const r = await CLOUD.signUp(email, pwd);
+      if (r && r.needConfirm) {
+        err.textContent = '注册成功，但要去邮箱点确认链接（或到测验页填验证码）才能登录';
+        return;
+      }
+    }
+    $('pwd').value = '';
+    closeAuth();
+    toast(ACCOUNT ? '已登录：' + ACCOUNT.email : '已登录，测验页会自动用这个账号');
+  } catch (e) {
+    const msg = zhErr(e && e.message ? e.message : e);
+    err.textContent = msg;
+    if (/还没确认/.test(msg)) {
+      err.innerHTML = msg + ' <a href="quiz.html" style="color:var(--accent)">去测验页确认 →</a>';
+    }
+  } finally {
+    go.disabled = false;
+    go.textContent = label;
+  }
+}
+
+$('btnAccount').addEventListener('click', () => {
+  if (!CLOUD_ON) { toast('还没配置云端，登录用不了'); return; }
+  if (ACCOUNT) {
+    $('accWho').textContent = ACCOUNT.email + '\n登录后，做题进度会同步到云端。';
+    $('accWho').style.whiteSpace = 'pre-line';
+    $('accModal').classList.add('on');
+  } else openAuth('login');
+});
+$('btnAuthGo').addEventListener('click', submitAuth);
+$('btnAuthSwitch').addEventListener('click', () => openAuth(authMode === 'login' ? 'signup' : 'login'));
+$('btnAuthClose').addEventListener('click', closeAuth);
+$('authModal').addEventListener('click', (e) => { if (e.target === $('authModal')) closeAuth(); });
+$('pwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuth(); });
+$('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pwd').focus(); });
+$('accModal').addEventListener('click', (e) => { if (e.target === $('accModal')) $('accModal').classList.remove('on'); });
+$('btnAccClose').addEventListener('click', () => $('accModal').classList.remove('on'));
+$('btnSignOut').addEventListener('click', async () => {
+  try { await CLOUD.signOut(); } catch { /* 就算请求失败也把本地清掉 */ }
+  $('accModal').classList.remove('on');
+  toast('已退出登录');
+});
+
+// Esc 关掉所有弹窗
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  ['authModal', 'accModal'].forEach((id) => $(id).classList.remove('on'));
+  $('modal').classList.remove('on');
+});
+
+if (CLOUD) {
+  CLOUD.onChange((u) => { ACCOUNT = u; paintAccount(); });
+  const ready = CLOUD.adoptHash ? CLOUD.adoptHash() : Promise.resolve(false);
+  ready.then(() => { ACCOUNT = CLOUD.user(); paintAccount(); }).catch(() => paintAccount());
+} else {
+  paintAccount();
+}
 
 load();
 </script>

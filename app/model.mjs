@@ -67,6 +67,13 @@ export function buildData(dataDir) {
     return { error: '还没有 state.json，先跑一次 snapshot。', ok: false };
   }
   const { agg, total: eventCount } = readEvents(eventsFile);
+  // 中文释义来自 quiz/glosses.json（墨墨 API 不提供词典释义）；没有就留空，页面自动省略
+  let glosses = {};
+  try {
+    glosses = JSON.parse(fs.readFileSync(path.join(dataDir, 'quiz', 'glosses.json'), 'utf8')) || {};
+  } catch {
+    glosses = {};
+  }
   const now = Date.now();
   const items = [];
 
@@ -87,6 +94,7 @@ export function buildData(dataDir) {
     items.push({
       id,
       w: w.spelling || '',
+      cn: shortenGloss(glosses[w.spelling || '']),
       sc: studyCount,
       ls: w.last_study || '',
       ns: w.next_study || '',
