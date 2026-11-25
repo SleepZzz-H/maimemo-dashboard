@@ -74,8 +74,9 @@
   .wrow span { color: var(--dim); font-size: 13.5px; }
   .hintline { color: var(--dim); font-size: 13px; line-height: 1.7; }
 
-  button.ghost { background: transparent; border-color: var(--line); color: var(--dim); padding: 8px 12px; font-size: 13.5px; }
+  button.ghost { background: transparent; border-color: var(--line); color: var(--dim); padding: 8px 12px; font-size: 13.5px; white-space: nowrap; flex: 0 0 auto; }
   button.ghost:hover { color: var(--text); }
+  @media (max-width: 520px) { #btnAccount { padding: 8px 9px; font-size: 12.5px; } }
   .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: flex-end; justify-content: center;
     background: rgba(0,0,0,.62); padding: 0; }
   .modal.on { display: flex; }
@@ -162,6 +163,7 @@ const $ = (id) => document.getElementById(id);
 const STATIC = !!window.__QUIZ_POOL__;
 const SIZE = 50;
 const KEY = 'maimemo-quiz-v1';
+const ADOPTED_FLAG = 'maimemo-quiz-v1:adopted';
 
 let POOL = [];
 let MODE = localStorage.getItem(KEY + ':mode') || 'mixed';
@@ -199,18 +201,33 @@ function todayStr() {
 let DAYS = {};        // { 'YYYY-MM-DD': {set, order, idx, answers, wrong, startedAt} }
 let ACCOUNT = null;   // 当前登录用户
 let pushTimer = 0;
+let pushFor = '';
 let pushState = 'idle'; // idle | pending | saving | saved | error
 
-function readLocal() {
+function storeKey() {
+  return ACCOUNT ? KEY + ':u:' + ACCOUNT.id : KEY + ':guest';
+}
+function readKey(k) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(k);
     if (!raw) return {};
     const o = JSON.parse(raw);
     return o && o.days ? o.days : o; // 兼容老版本（没有 days 包裹）
   } catch { return {}; }
 }
+function readLocal() {
+  // 升级：老版本把进度直接存在 KEY 里，第一次读到就归到「游客」
+  try {
+    const legacy = localStorage.getItem(KEY);
+    if (legacy && !localStorage.getItem(KEY + ':guest')) {
+      localStorage.setItem(KEY + ':guest', JSON.stringify({ v: 2, days: readKey(KEY) }));
+      localStorage.removeItem(KEY);
+    }
+  } catch {}
+  return readKey(storeKey());
+}
 function writeLocal() {
-  try { localStorage.setItem(KEY, JSON.stringify({ v: 2, days: DAYS })); } catch {}
+  try { localStorage.setItem(storeKey(), JSON.stringify({ v: 2, days: DAYS })); } catch {}
 }
 function ansCount(rec) {
   return rec && rec.answers ? Object.keys(rec.answers).length : 0;
@@ -242,12 +259,13 @@ function trimmedDays() {
 function queuePush() {
   if (!window.Cloud || !Cloud.configured() || !ACCOUNT) return;
   pushState = 'pending';
+  pushFor = ACCOUNT.id;
   paintSync();
   clearTimeout(pushTimer);
   pushTimer = setTimeout(doPush, 1200);
 }
 async function doPush() {
-  if (!ACCOUNT) return;
+  if (!ACCOUNT || ACCOUNT.id !== pushFor) return; // 切过账号，旧任务作废
   pushState = 'saving';
   paintSync();
   try {
@@ -299,19 +317,31 @@ function paintAccount() {
 
 async function pullAndMerge() {
   if (!ACCOUNT) return false;
+  let remoteQuiz = null;
   try {
     const p = await Cloud.pull();
-    const q = p && p.quiz;
-    const changed = mergeDays(q && q.days, true);
-    if (changed) writeLocal();
-    pushState = 'saved';
-    paintSync();
-    return changed;
+    remoteQuiz = p && p.quiz;
   } catch (e) {
     pushState = 'error';
     paintSync();
     return false;
   }
+  let changed = mergeDays(remoteQuiz && remoteQuiz.days, true);
+  const cloudEmpty = !remoteQuiz || !remoteQuiz.days || !Object.keys(remoteQuiz.days).length;
+  // 云端还没东西、这台设备也没这个账号的缓存：把游客进度接过来（每台设备只做一次）
+  if (cloudEmpty && !Object.keys(DAYS).length && !localStorage.getItem(ADOPTED_FLAG)) {
+    const g = readKey(KEY + ':guest');
+    if (Object.keys(g).length) {
+      DAYS = g;
+      changed = true;
+      try { localStorage.setItem(ADOPTED_FLAG, '1'); } catch {}
+      toast('已把本机的游客进度接到这个账号');
+    }
+  }
+  if (changed) { writeLocal(); queuePush(); }
+  pushState = 'saved';
+  paintSync();
+  return changed;
 }
 
 async function cloudInit() {
@@ -320,7 +350,7 @@ async function cloudInit() {
   Cloud.onChange((u) => { ACCOUNT = u; paintAccount(); });
   ACCOUNT = Cloud.user();
   paintAccount();
-  if (ACCOUNT) await pullAndMerge();
+  if (ACCOUNT) { DAYS = readLocal(); await pullAndMerge(); }
 }
 
 // 抽样：先上「真的忘过」的词（遗忘次数加权），再用难度分补足，不看今天该不该复习
@@ -605,6 +635,7 @@ $('authForm').addEventListener('submit', async (e) => {
     }
     ACCOUNT = Cloud.user();
     $('authModal').classList.remove('on');
+    DAYS = readLocal(); // 换成这个账号自己的本地进度
     paintAccount();
     const merged = await pullAndMerge();
     makeToday();
@@ -624,8 +655,13 @@ $('btnSyncNow').addEventListener('click', async () => {
 $('btnSignOut').addEventListener('click', () => {
   Cloud.signOut();
   ACCOUNT = null;
+  clearTimeout(pushTimer);
+  pushFor = '';
+  DAYS = readLocal(); // 回到游客进度
   $('accModal').classList.remove('on');
   paintAccount();
+  makeToday();
+  render();
   toast('已退出，进度还在本机');
 });
 
