@@ -161,7 +161,7 @@ export function buildQuizPool(dataDir) {
   for (const it of data.items) {
     const cn = shortenGloss(glosses[it.w]);
     if (!cn) continue;
-    pool.push({ w: it.w, cn, s: it.score, sc: it.sc, lr: it.lr, ns: it.ns, dueIn: it.dueIn });
+    pool.push({ w: it.w, cn, s: it.score, sc: it.sc, lr: it.lr, ns: it.ns, v: it.v || 0, f: it.f || 0, sticky: it.sticky || 0 });
   }
   return {
     ok: true,

@@ -17,6 +17,8 @@ const STATIC = {
   '/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png'],
   '/quiz.html': ['quiz.html', 'text/html; charset=utf-8'],
   '/quiz': ['quiz.html', 'text/html; charset=utf-8'],
+  '/config.js': ['config.js', 'text/javascript; charset=utf-8'],
+  '/cloud.js': ['cloud.js', 'text/javascript; charset=utf-8'],
 };
 
 function lanAddresses() {

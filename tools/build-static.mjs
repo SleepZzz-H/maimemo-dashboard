@@ -66,6 +66,11 @@ fs.writeFileSync(
   'utf8'
 );
 
+// 测验页的两个依赖：云同步配置 + 极简 Supabase 客户端（都是普通脚本，相对路径引用）
+for (const f of ['config.js', 'cloud.js']) {
+  fs.copyFileSync(path.join(APP, f), path.join(OUT, f));
+}
+
 // 图标与清单：所有路径改成相对路径，放在 /<repo>/ 子路径下也能用
 fs.cpSync(path.join(APP, 'icons'), path.join(OUT, 'icons'), { recursive: true });
 fs.copyFileSync(path.join(APP, 'favicon.ico'), path.join(OUT, 'favicon.ico'));

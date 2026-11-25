@@ -88,12 +88,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 
 点看板右上角的 **测验**，或者直接开 `/quiz.html`。
 
-- **每天 50 个词**，0 点自动换新的一组；同一天刷新还是同一组，进度存在浏览器本地
+- **每天 50 个词**，0 点自动换新的一组；同一天刷新还是同一组，进度先存浏览器本地，登录后同步到云端
 - **两种方向**：英→中、中→英，也可以选「混合方向」随机穿插
-- **选词规则**：30% 今天该复习的（`next_study_date` 已到期）+ 50% 难度分最高的那批 + 剩下的随机补，既练难词又不至于一辈子只练同几十个词
+- **选词规则**：40% 按「遗忘程度」加权挑（模糊 ×3 + 忘记 ×6 + 顽固 ×2，就是你在这份看板上被标记过的词）+ 难度分前 11% 里随机补 + 剩余从全库随机补。**不看「今天该不该复习」**——要练的是记不牢的，不是日程表上排到的
 - **答错立刻给答案**：正确项标绿、错误项标红，下面直接显示「单词 = 释义」
 - **结束页**：正确率、用时、错词清单；错词 ≥ 4 个时可以「只练错词」
 - 键盘 `1`–`4` 选答案，`Enter` 下一题
+
+### 账号与云同步（可选）
+
+不登录 = 进度只存在这台设备的浏览器里。点右上角 **登录同步** 可以用邮箱注册/登录，进度存到 Supabase（免费额度够用）：
+
+1. 在 [supabase.com](https://supabase.com) 建一个项目（用 GitHub 账号登录最快）
+2. `Authentication → Providers → Email` 里把 **Confirm email** 关掉（否则注册后要先去邮箱点链接）
+3. `Project Settings → API` 里复制 **Project URL** 和 **anon public key**
+4. 填进 `app/config.js`，重新构建发布：`node tools/build-static.mjs`
+
+anon key 本来就是给浏览器用的公开 key；进度写在当前登录用户自己的 `user_metadata` 里，别的用户读不到，所以**不需要建表、不用写 SQL**。
 
 一个先说清楚的地方：**墨墨开放 API 不返回词典释义**。`interpretation` 接口给的是「你自己添加的释义」，实测 1839 个词全是空的。所以中文释义是构建时用有道词典的公开接口（`dict.youdao.com/jsonapi`）抓下来缓存到 `quiz/glosses.json` 的，脚本在 `tools/fetch-glosses.mjs`，抓完 1839 个词约 10 分钟。要刷新释义重新跑一遍就行，已抓过的会跳过。
 
@@ -108,6 +119,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 │   ├── server.mjs        # 零依赖 Node 服务：/api/data、/api/sync、/api/health、/api/lan
 │   ├── index.html        # 单页界面（内联 CSS/JS，无外部依赖）
 │   ├── quiz.html         # 每日 50 词测验页
+│   ├── config.js         # Supabase 的 URL / anon key（留空 = 只用本地进度）
+│   ├── cloud.js          # 极简 Supabase 客户端（纯 fetch，不引 CDN）
 │   ├── model.mjs         # 数据聚合 + 难度分 + 测验词库（服务端和静态版共用）
 │   ├── manifest.webmanifest
 │   ├── icons/            # 16–256 px 的 ico + 各尺寸 png（PWA / 桌面图标共用）
@@ -124,7 +137,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 │   └── publish.ps1       # 快照 → 生成静态版 → 提交推送
 ├── docs/                 # 静态版产物，GitHub Pages 从这里发布
 │   ├── index.html        # 数据内联的单页，可以单独发给别人
-│   └── quiz.html         # 测验页，词库也内联，打开就能做题
+│   ├── quiz.html         # 测验页，词库也内联，打开就能做题
+│   ├── config.js         # 从 app/ 复制过来（云同步配置）
+│   └── cloud.js          # 从 app/ 复制过来
 ├── notes/
 │   └── maimemo-api-notes.md
 ├── state.json            # 运行时生成，不进仓库
