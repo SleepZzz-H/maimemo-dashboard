@@ -4,6 +4,25 @@
 
 ![看板截图](screenshot.png)
 
+## 在线版（不开电脑也能看）
+
+**https://sleepzzz-h.github.io/maimemo-dashboard/**
+
+托管在 GitHub Pages 上，手机流量、公司电脑、发给同学，打开就能看，不需要家里这台机器开着。
+
+页面由 `docs/index.html` 提供，数据是**生成那一刻的快照**（不是实时）。想更新：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\publish.ps1
+```
+
+它会依次：抓一次墨墨记录 → 重新生成 `docs/` → 提交并推送（直连不通时自动走本机 7890 代理）。推送后约 30 秒 GitHub Pages 自动刷新。只改了样式、数据没变时加 `-SkipSnapshot`。
+
+**隐私**：Pages 是公开的，任何人拿到链接都能看到这份词表和复习次数（页面加了 `noindex`，搜索引擎不会收录，但不算访问控制）。不想公开就只自己留着 `index.html`，见下面「发给别人」。
+
+### 发给别人
+
+`docs/index.html` 是**单文件**：数据全内联在 HTML 里，500 KB 左右，没有任何外部依赖。可以直接微信发过去，对方双击就能看（图标会缺，不影响内容）。
 ## 它解决什么问题
 
 墨墨开放 API 的 `study records` 对每个词只返回两个信息：
