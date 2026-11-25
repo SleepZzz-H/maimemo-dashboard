@@ -92,6 +92,8 @@
   .authrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .tiny { color: #6d7488; font-size: 11.5px; line-height: 1.7; margin: 10px 0 0; }
   .grow { flex: 1; }
+  .memosep { height: 1px; background: var(--line); margin: 18px 0 14px; }
+  .sheet h4 { margin: 0 0 8px; font-size: 13.5px; font-weight: 600; letter-spacing: .02em; }
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); opacity: 0;
     pointer-events: none; background: #1b2130; border: 1px solid var(--line); color: var(--text);
     padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 80; transition: .2s; }
@@ -119,6 +121,20 @@
     </select>
   </div>
 </header>
+
+<div class="modal" id="memoModal">
+  <div class="sheet">
+    <h3>绑定你的墨墨账号</h3>
+    <p class="hintline">填一个墨墨开放 API 的 Token，就能把你墨墨里正在背的词拿来自测，题目按你自己的复习次数和遗忘情况挑。</p>
+    <label class="field"><span>墨墨 API Token</span><input id="memoToken" type="password" autocomplete="off" spellcheck="false" placeholder="32 或 64 位十六进制" /></label>
+    <div class="autherr" id="memoErr"></div>
+    <div class="authrow">
+      <button type="button" class="primary" id="btnMemoGo">绑定并同步</button>
+      <button type="button" class="ghost" id="btnCloseMemo">取消</button>
+    </div>
+    <p class="tiny">Token 只存在你自己的浏览器里（登录后也会存进你的云端账号）；本站不保存你的墨墨密码，也拿不到。没有 Token 的话去 open.maimemo.com 免费申请一个。</p>
+  </div>
+</div>
 
 <main id="main"></main>
 
@@ -161,6 +177,15 @@
       <span class="grow"></span>
       <button type="button" class="ghost" id="btnCloseAcc">关闭</button>
     </div>
+
+    <div class="memosep"></div>
+    <h4>墨墨背单词</h4>
+    <p class="tiny" id="memoWho">还没绑定：现在用的是通用的 1839 个词。</p>
+    <div class="authrow">
+      <button type="button" class="primary" id="btnMemoBind">绑定墨墨账号</button>
+      <button type="button" id="btnMemoSync" hidden>重新同步词库</button>
+      <button type="button" class="ghost" id="btnMemoUnbind" hidden>解绑</button>
+    </div>
   </div>
 </div>
 
@@ -174,6 +199,9 @@ const KEY = 'maimemo-quiz-v1';
 const ADOPTED_FLAG = 'maimemo-quiz-v1:adopted';
 
 let POOL = [];
+let DISTRACT = [];  // 干扰项来源：永远带中文释义的那批词
+let MEMO = null;    // 绑定的墨墨账号词库 {token, at, words}
+let GLOSS = {};     // word -> 中文（跨账号共用的释义缓存）
 let MODE = localStorage.getItem(KEY + ':mode') || 'mixed';
 let today = '';
 let setNo = 1;
@@ -378,6 +406,7 @@ function shuffleWith(arr, rand) {
 }
 
 function forgetWeight(p) {
+  if (typeof p.s === 'number') return p.s; // 绑了墨墨账号时，用墨墨那边的复习情况估算
   return (p.f || 0) * 6 + (p.v || 0) * 3 + (p.sticky || 0) * 2;
 }
 
@@ -411,7 +440,8 @@ function buildQuestions(rand, words) {
     const dir = MODE === 'mixed' ? (rand() < 0.5 ? 'en2cn' : 'cn2en') : MODE;
     const others = [];
     const used = new Set([p.cn]);
-    const pool = POOL.filter((x) => x.w !== p.w);
+    const src = DISTRACT.length ? DISTRACT : POOL;
+    const pool = src.filter((x) => x.w !== p.w && x.cn);
     for (let guard = 0; others.length < 3 && guard < 400; guard++) {
       const cand = pool[Math.floor(rand() * pool.length)];
       if (!cand || used.has(cand.cn)) continue;
@@ -433,7 +463,7 @@ function seedKey(n) {
   return today + '#' + (n || setNo) + '#' + who;
 }
 
-function makeToday() {
+async function makeToday() {
   today = todayStr();
   const rec = DAYS[today];
   if (rec && rec.set === setNo && rec.order && rec.order.length) {
@@ -441,6 +471,7 @@ function makeToday() {
     const rnd = mulberry32(hashSeed(seedKey(rec.set)));
     const byWord = new Map(POOL.map((p) => [p.w, p]));
     const words = rec.order.map((w) => byWord.get(w)).filter(Boolean);
+    await ensureGlosses(words);
     qs = words.length ? buildQuestions(rnd, words) : [];
     answers = rec.answers || {};
     wrong = rec.wrong || [];
@@ -449,10 +480,212 @@ function makeToday() {
   } else {
     const rnd = mulberry32(hashSeed(seedKey(setNo)));
     const words = pickWords(rnd, SIZE);
+    await ensureGlosses(words);
     qs = buildQuestions(rnd, words);
     answers = {}; wrong = []; idx = 0; startedAt = Date.now();
     persist();
   }
+}
+
+// —— 绑定墨墨账号：把「我正在背的词」拉下来当题库 ——
+const MEMO_KEY = 'maimemo-memo-v1';
+const GLOSS_KEY = 'maimemo-gloss-v1';
+const MEMO_API = (window.MEMO_QUIZ_CLOUD && window.MEMO_QUIZ_CLOUD.memoProxy) || '';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let lastCall = 0; // 上次调墨墨的时间，用来限速
+
+function memoStoreKey() {
+  return ACCOUNT ? MEMO_KEY + ':u:' + ACCOUNT.id : MEMO_KEY + ':guest';
+}
+
+function loadGloss() {
+  try { GLOSS = JSON.parse(localStorage.getItem(GLOSS_KEY) || '{}') || {}; } catch (e) { GLOSS = {}; }
+  for (const p of DISTRACT) if (p.cn && !GLOSS[p.w]) GLOSS[p.w] = p.cn;
+}
+function saveGloss() {
+  try { localStorage.setItem(GLOSS_KEY, JSON.stringify(GLOSS)); } catch (e) { /* 满了就算了 */ }
+}
+
+// 墨墨回来的释义可能很长，选项里放不下
+function shorten(s) {
+  let t = String(s || '').split(/[；;]/)[0].trim();
+  if (t.length > 34) t = t.slice(0, 33) + '…';
+  return t;
+}
+
+function applyMemoPool() {
+  if (!MEMO || !MEMO.words || !MEMO.words.length) return;
+  POOL = MEMO.words.map((x) => ({ w: x.w, sc: x.sc, lr: x.lr, st: x.st, s: x.s, cn: GLOSS[x.w] || '' }));
+}
+
+function loadMemo() {
+  MEMO = null;
+  try { MEMO = JSON.parse(localStorage.getItem(memoStoreKey()) || 'null'); } catch (e) { MEMO = null; }
+  if (!MEMO || !Array.isArray(MEMO.words) || !MEMO.words.length) {
+    MEMO = null;
+    POOL = DISTRACT.slice();
+  } else {
+    applyMemoPool();
+  }
+  paintMemo();
+}
+
+function saveMemo() {
+  try {
+    if (MEMO) localStorage.setItem(memoStoreKey(), JSON.stringify(MEMO));
+    else localStorage.removeItem(memoStoreKey());
+  } catch (e) { /* 存不下就算了，这次也能用 */ }
+  paintMemo();
+}
+
+function paintMemo() {
+  if (!$('memoWho')) return;
+  const bound = !!(MEMO && MEMO.words && MEMO.words.length);
+  $('btnMemoBind').hidden = bound;
+  $('btnMemoSync').hidden = !bound;
+  $('btnMemoUnbind').hidden = !bound;
+  if (!MEMO_API) {
+    $('memoWho').textContent = '这个版本没配中转服务，只能用通用词库。';
+    $('btnMemoBind').hidden = true;
+    return;
+  }
+  if (!bound) { $('memoWho').textContent = '还没绑定：现在用的是通用的 1839 个词。'; return; }
+  const d = new Date(MEMO.at || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  $('memoWho').textContent = `已绑定：${MEMO.words.length} 个词，${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())} 同步。`;
+}
+
+async function memoApi(path, body, token) {
+  if (!MEMO_API) throw new Error('没有配置中转服务');
+  let r;
+  for (let attempt = 0; ; attempt++) {
+    // 墨墨限流挺严：宁可慢一点，也不要 429
+    const wait = 400 - (Date.now() - lastCall);
+    if (wait > 0) await sleep(wait);
+    lastCall = Date.now();
+    try {
+      r = await fetch(MEMO_API + '?act=api', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-memo-token': token },
+        body: JSON.stringify({ path: path, body: body || {} }),
+      });
+    } catch (e) {
+      throw new Error('连不上中转服务，检查网络或 config.js 里的 memoProxy');
+    }
+    if ((r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503) && attempt < 3) {
+      await sleep(2000 * (attempt + 1));
+      continue;
+    }
+    break;
+  }
+  const j = await r.json().catch(() => null);
+  if (!j) throw new Error('中转服务返回了非 JSON（HTTP ' + r.status + '）');
+  if (r.status >= 400 || j.success === false) {
+    const errs = Array.isArray(j.errors) ? j.errors : [];
+    const code = (errs[0] && errs[0].code) || j.code || '';
+    const msg = (errs[0] && errs[0].msg) || j.msg || j.message || '';
+    if (/permission|auth|token|forbidden|invalid/i.test(code + ' ' + msg)) throw new Error('Token 好像不对，或者没有开放 API 权限');
+    if (r.status >= 500) throw new Error('墨墨服务端临时出错（HTTP ' + r.status + '），过几分钟再试');
+    throw new Error('墨墨返回 HTTP ' + r.status + (msg || code ? '：' + (msg || code) : ''));
+  }
+  return j;
+}
+
+function midIso(a, b) {
+  const t = (new Date(a).getTime() + new Date(b).getTime()) / 2;
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T00:00:00+08:00`;
+}
+
+// 墨墨一次最多给 1000 条，时间窗太宽就二分
+async function pullRecords(token) {
+  const out = [];
+  const seen = new Set();
+  const grab = async (s, e, depth) => {
+    const j = await memoApi(
+      '/open/api/v1/memo/study/query_study_records',
+      { voc_ids: [], spellings: [], as_count: false, limit: 1000, next_study_date: { start: s, end: e } },
+      token
+    );
+    const list = Array.isArray(j.records) ? j.records : Array.isArray((j.data || {}).records) ? j.data.records : [];
+    // 一次最多给 1000 条：撞到上限就把时间窗对半切，切到能一次拿完为止
+    const spanDays = (new Date(e).getTime() - new Date(s).getTime()) / 86400000;
+    if (list.length >= 1000 && depth < 14 && spanDays > 2) {
+      const m = midIso(s, e);
+      await grab(s, m, depth + 1);
+      await grab(m, e, depth + 1);
+      return;
+    }
+    for (const r of list) {
+      if (r && r.voc_id && !seen.has(r.voc_id)) { seen.add(r.voc_id); out.push(r); }
+    }
+  };
+  await grab('2020-01-01T00:00:00+08:00', '2200-01-01T00:00:00+08:00', 0);
+  return out;
+}
+
+// 没有逐次遗忘记录，只能用「复习次数 + 最近一次回答 + 顽固标记」估个分
+function memoScore(r) {
+  const lr = r.last_response || '';
+  const sticky = (r.tags || []).indexOf('STICKING') >= 0 ? 1 : 0;
+  let s = Math.min(r.study_count || 0, 20) * 0.35 + sticky * 2.5;
+  if (lr === 'FORGET') s += 5;
+  else if (lr === 'VAGUE') s += 3;
+  else if (lr === 'WELL_FAMILIAR') s -= 1;
+  return Math.round(s * 100) / 100;
+}
+
+async function syncMemo(token) {
+  token = (token || '').trim();
+  if (!/^[0-9a-zA-Z]{20,}$/.test(token)) throw new Error('Token 看着不像（应该是 32 或 64 位字母数字）');
+  await memoApi('/open/api/v1/memo/study/get_study_progress', {}, token); // 顺便验 token
+  const recs = await pullRecords(token);
+  if (!recs.length) throw new Error('这个墨墨账号里没查到学习记录，先加几个词再试');
+  MEMO = {
+    token: token,
+    at: Date.now(),
+    words: recs
+      .filter((r) => r.voc_spelling)
+      .map((r) => ({
+        w: r.voc_spelling,
+        sc: r.study_count || 0,
+        lr: r.last_response || '',
+        st: (r.tags || []).indexOf('STICKING') >= 0 ? 1 : 0,
+        s: memoScore(r),
+      })),
+  };
+  saveMemo();
+  applyMemoPool();
+  return MEMO.words.length;
+}
+
+async function ensureGlosses(words) {
+  const need = [];
+  for (const p of words) {
+    if (p.cn) continue;
+    if (GLOSS[p.w]) { p.cn = GLOSS[p.w]; continue; }
+    need.push(p);
+  }
+  if (!need.length) return;
+  if (!MEMO_API || !MEMO || !MEMO.token) { for (const p of need) p.cn = '（暂无释义）'; return; }
+  toast(`正在取 ${need.length} 个词的释义…`);
+  const queue = need.slice();
+  const worker = async () => {
+    while (queue.length) {
+      const p = queue.shift();
+      let g = '';
+      try {
+        const r = await fetch(MEMO_API + '?act=dict&w=' + encodeURIComponent(p.w), { cache: 'no-store' });
+        const j = await r.json();
+        if (j && j.ok && j.gloss) g = shorten(j.gloss);
+      } catch (e) { g = ''; }
+      p.cn = g || '（暂无释义）';
+      if (g) GLOSS[p.w] = p.cn;
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  saveGloss();
 }
 
 function esc(s) {
@@ -557,10 +790,12 @@ function renderDone() {
   $('redo').addEventListener('click', () => {
     answers = {}; wrong = []; idx = 0; startedAt = Date.now(); persist(); render();
   });
-  $('newset').addEventListener('click', () => {
+  $('newset').addEventListener('click', async () => {
     setNo += 1;
     const rnd = mulberry32(hashSeed(seedKey(setNo)));
-    qs = buildQuestions(rnd, pickWords(rnd, SIZE));
+    const words = pickWords(rnd, SIZE);
+    await ensureGlosses(words);
+    qs = buildQuestions(rnd, words);
     answers = {}; wrong = []; idx = 0; startedAt = Date.now();
     persist(); render();
   });
@@ -653,7 +888,8 @@ $('authForm').addEventListener('submit', async (e) => {
     DAYS = readLocal(); // 换成这个账号自己的本地进度
     paintAccount();
     const merged = await pullAndMerge();
-    makeToday();
+    loadMemo();
+    await makeToday();
     render();
     toast(merged ? '已登录，云端进度已合并' : '已登录，进度会存到云端');
   } catch (err) {
@@ -690,7 +926,8 @@ $('btnVerify').addEventListener('click', async () => {
     hideConfirm();
     DAYS = readLocal(); paintAccount();
     await pullAndMerge();
-    makeToday(); render();
+    loadMemo();
+    await makeToday(); render();
     toast('邮箱已验证，进度会存到云端');
   } catch (err) {
     $('confirmErr').textContent = zhErr(err);
@@ -717,9 +954,58 @@ $('btnSignOut').addEventListener('click', () => {
   DAYS = readLocal(); // 回到游客进度
   $('accModal').classList.remove('on');
   paintAccount();
-  makeToday();
-  render();
+  loadMemo();
+  makeToday().then(render);
   toast('已退出，进度还在本机');
+});
+
+function resetToday() {
+  // 词库换了，今天这一组就作废，重新抽
+  delete DAYS[todayStr()];
+  setNo = 1;
+  persist();
+}
+
+// —— 绑定墨墨账号的界面 ——
+function openMemo() {
+  $('memoErr').textContent = '';
+  if (MEMO && MEMO.token) $('memoToken').value = MEMO.token;
+  $('memoModal').classList.add('on');
+  setTimeout(() => $('memoToken').focus(), 50);
+}
+$('btnMemoBind').addEventListener('click', openMemo);
+$('btnMemoSync').addEventListener('click', openMemo);
+$('btnCloseMemo').addEventListener('click', () => $('memoModal').classList.remove('on'));
+$('memoModal').addEventListener('click', (e) => { if (e.target.id === 'memoModal') $('memoModal').classList.remove('on'); });
+
+$('btnMemoGo').addEventListener('click', async () => {
+  const t = ($('memoToken').value || '').trim();
+  $('memoErr').textContent = '';
+  $('btnMemoGo').disabled = true;
+  $('btnMemoGo').textContent = '同步中…';
+  try {
+    const n = await syncMemo(t);
+    $('memoModal').classList.remove('on');
+    toast(`已绑定，拿到 ${n} 个词`);
+    resetToday();
+    await makeToday();
+    render();
+  } catch (err) {
+    $('memoErr').textContent = err.message || String(err);
+  } finally {
+    $('btnMemoGo').disabled = false;
+    $('btnMemoGo').textContent = '绑定并同步';
+  }
+});
+
+$('btnMemoUnbind').addEventListener('click', () => {
+  MEMO = null;
+  saveMemo();
+  POOL = DISTRACT.slice();
+  resetToday();
+  $('accModal').classList.remove('on');
+  toast('已解绑，回到通用词库');
+  makeToday().then(render);
 });
 
 async function init() {
@@ -740,8 +1026,11 @@ async function init() {
     $('main').innerHTML = '<div class="card">词库是空的。先在电脑上跑一次 <code>tools/fetch-glosses.mjs</code> 生成中文释义。</div>';
     return;
   }
+  DISTRACT = POOL.slice();
+  loadGloss();
   await cloudInit();
-  makeToday();
+  loadMemo();
+  await makeToday();
   render();
 }
 
