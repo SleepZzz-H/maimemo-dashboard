@@ -1,0 +1,12 @@
+# 个人学习数据 —— 绝不能提交
+state.json
+events.jsonl
+last-run.txt
+snapshot.lock
+*.lock
+
+# 其他
+node_modules/
+*.log
+preview*.png
+.edge-shot/

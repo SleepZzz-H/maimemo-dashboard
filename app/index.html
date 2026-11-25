@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f1115" />
+<title>墨墨难词看板</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #262b36;
+    --text: #e8ecf3; --dim: #8b93a5; --accent: #6f8cff; --warn: #ffb454;
+    --bad: #ff6b6b; --good: #4ade80;
+  }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  body { padding-bottom: 40px; }
+  header { position: sticky; top: 0; z-index: 20; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 880px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+  .title { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+  .title span { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 14px; cursor: pointer; transition: .15s; }
+  button:active { transform: scale(.97); }
+  button.primary { background: linear-gradient(180deg,#3f5bd8,#3348b8); border-color: #3a51c9; }
+  button[disabled] { opacity: .55; cursor: default; }
+  main { max-width: 880px; margin: 0 auto; padding: 14px 16px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 20px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--dim); font-size: 12px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  input[type=search], select { font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; outline: none; }
+  input[type=search] { flex: 1; min-width: 140px; }
+  input[type=search]:focus, select:focus { border-color: var(--accent); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { font-size: 13px; padding: 6px 12px; border-radius: 999px; background: var(--panel);
+    border: 1px solid var(--line); color: var(--dim); cursor: pointer; }
+  .chip.on { color: #fff; background: #2b3a75; border-color: #3d54a8; }
+  .notice { background: #241d10; border: 1px solid #4a3a18; color: #ffd189; border-radius: 12px;
+    padding: 10px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .row { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    display: flex; gap: 12px; align-items: flex-start; }
+  .row.hot { border-color: #4a2626; background: linear-gradient(180deg,#1c1618,#171a21 60%); }
+  .rank { color: var(--dim); font-size: 12px; width: 24px; text-align: right; padding-top: 3px;
+    font-variant-numeric: tabular-nums; flex: none; }
+  .body { flex: 1; min-width: 0; }
+  .word { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badges { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 6px; font-weight: 500; white-space: nowrap; }
+  .b-vague { background: #3a2a12; color: var(--warn); border: 1px solid #5a3f16; }
+  .b-forget { background: #3a1616; color: var(--bad); border: 1px solid #5c2020; }
+  .b-sticky { background: #2a1f3d; color: #c4a6ff; border: 1px solid #3f2e5c; }
+  .b-muted { background: #20242e; color: var(--dim); border: 1px solid var(--line); }
+  .meta { color: var(--dim); font-size: 12.5px; margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .meta .hi { color: #cfd6e4; }
+  .score { text-align: right; flex: none; }
+  .score b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .score span { display: block; color: var(--dim); font-size: 11px; }
+  .empty { text-align: center; color: var(--dim); padding: 50px 10px; font-size: 14px; }
+  footer { max-width: 880px; margin: 22px auto 0; padding: 0 16px; color: #5f6779; font-size: 11.5px; line-height: 1.7; }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #2a3143;
+    border: 1px solid #3b455c; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: .25s; max-width: 88vw; text-align: center; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .title { font-size: 15px; }
+    .title span { display: none; }
+    .word { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="title">墨墨难词看板<span id="syncAt">加载中…</span></div>
+    <div class="spacer"></div>
+    <button id="btnSync" class="primary">同步墨墨</button>
+  </div>
+</header>
+
+<main>
+  <div class="stats">
+    <div class="stat"><b id="sWords">–</b><span>收录单词</span></div>
+    <div class="stat"><b id="sVague" style="color:var(--warn)">–</b><span>模糊次数</span></div>
+    <div class="stat"><b id="sForget" style="color:var(--bad)">–</b><span>忘记次数</span></div>
+    <div class="stat"><b id="sSticky" style="color:#c4a6ff">–</b><span>顽固标记</span></div>
+  </div>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <div class="controls">
+    <input id="q" type="search" placeholder="搜索单词…" autocomplete="off" />
+    <select id="sort">
+      <option value="score">按难度分</option>
+      <option value="vague">按模糊次数</option>
+      <option value="forget">按忘记次数</option>
+      <option value="count">按复习次数</option>
+      <option value="due">按到期时间</option>
+      <option value="az">按字母</option>
+    </select>
+  </div>
+
+  <div class="chips" id="chips">
+    <div class="chip on" data-f="all">全部</div>
+    <div class="chip" data-f="sticky">顽固</div>
+    <div class="chip" data-f="vague">模糊过</div>
+    <div class="chip" data-f="forget">忘记过</div>
+    <div class="chip" data-f="due">今天该复习</div>
+    <div class="chip" data-f="lowcount">复习少</div>
+  </div>
+
+  <div class="list" id="list"></div>
+  <div class="empty" id="empty" hidden>没有符合条件的单词</div>
+</main>
+
+<footer>
+  难度分 = 模糊×3 + 忘记×6 + 顽固标记×2 + 复习次数×0.3（封顶 25 次）+ 最近一次回答的加成。<br />
+  模糊/忘记次数来自本地每日快照（<code>events.jsonl</code>），墨墨 API 不提供逐次历史，2026-11-25 起开始累积。
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let DATA = null;
+let filter = 'all';
+
+const fmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+};
+
+function dayDiffLocal(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  const n = new Date();
+  const a = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const b = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.round((a - b) / 86400000);
+}
+
+function dueText(iso) {
+  const dd = dayDiffLocal(iso);
+  if (dd === null) return '无计划';
+  if (dd < 0) return `逾期 ${-dd} 天`;
+  if (dd === 0) return '今天';
+  if (dd === 1) return '明天';
+  return `${dd} 天后`;
+}
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function render() {
+  if (!DATA || !DATA.ok) {
+    $('list').innerHTML = '';
+    $('empty').hidden = false;
+    $('empty').textContent = (DATA && DATA.error) || '还没有数据，点右上角「同步墨墨」跑一次。';
+    return;
+  }
+  const t = DATA.totals;
+  $('sWords').textContent = t.words;
+  $('sVague').textContent = t.vague;
+  $('sForget').textContent = t.forget;
+  $('sSticky').textContent = t.sticky;
+  const when = DATA.updatedAt ? new Date(DATA.updatedAt).toLocaleString('zh-CN', { hour12: false }) : '未知';
+  $('syncAt').textContent = '上次快照 ' + when;
+
+  const nb = $('notice');
+  if (!DATA.hasEvents) {
+    nb.hidden = false;
+    nb.innerHTML = `还没有累积到复习事件（当前 <b>0</b> 条），难度分暂时靠「顽固标记 + 复习次数 + 最近一次回答」估算。过了今晚 22:00 的自动快照后会开始有真实次数。`;
+  } else {
+    nb.hidden = true;
+  }
+
+  const q = $('q').value.trim().toLowerCase();
+  const sort = $('sort').value;
+  let rows = DATA.items.filter((it) => {
+    if (q && !it.w.toLowerCase().includes(q)) return false;
+    switch (filter) {
+      case 'sticky': return it.sticky === 1;
+      case 'vague': return it.v > 0 || it.lr === 'VAGUE';
+      case 'forget': return it.f > 0 || it.lr === 'FORGET';
+      case 'due': return dayDiffLocal(it.ns) !== null && dayDiffLocal(it.ns) <= 0;
+      case 'lowcount': return it.sc <= 2;
+      default: return true;
+    }
+  });
+
+  const cmp = {
+    score: (a, b) => b.score - a.score || b.sc - a.sc,
+    vague: (a, b) => b.v - a.v || b.score - a.score,
+    forget: (a, b) => b.f - a.f || b.score - a.score,
+    count: (a, b) => b.sc - a.sc || a.w.localeCompare(b.w),
+    due: (a, b) => (dayDiffLocal(a.ns) === null ? 9e9 : dayDiffLocal(a.ns)) - (dayDiffLocal(b.ns) === null ? 9e9 : dayDiffLocal(b.ns)),
+    az: (a, b) => a.w.localeCompare(b.w),
+  }[sort];
+  rows.sort(cmp);
+
+  $('list').innerHTML = rows.slice(0, 300).map((it, i) => {
+    const hot = it.v >= 2 || it.f >= 1 || it.lr === 'FORGET';
+    const badges = [];
+    if (it.v) badges.push(`<span class="badge b-vague">模糊 ${it.v}</span>`);
+    if (it.f) badges.push(`<span class="badge b-forget">忘记 ${it.f}</span>`);
+    if (it.sticky) badges.push(`<span class="badge b-sticky">顽固</span>`);
+    if (!it.v && !it.f && it.lr) badges.push(`<span class="badge b-muted">最近${it.lrCn}</span>`);
+    return `<div class="row${hot ? ' hot' : ''}">
+      <div class="rank">${i + 1}</div>
+      <div class="body">
+        <div class="word">${it.w}<span class="badges">${badges.join('')}</span></div>
+        <div class="meta">
+          <span>复习 <span class="hi">${it.sc}</span> 次</span>
+          <span>下次 ${fmtDate(it.ns)}（${dueText(it.ns)}）</span>
+          ${it.interval !== null ? `<span>间隔 ${it.interval} 天</span>` : ''}
+          ${it.un ? `<span>未知 ${it.un} 次</span>` : ''}
+        </div>
+      </div>
+      <div class="score"><b>${it.score}</b><span>难度分</span></div>
+    </div>`;
+  }).join('');
+
+  $('empty').hidden = rows.length > 0;
+  if (!rows.length) $('empty').textContent = '没有符合条件的单词';
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/data', { cache: 'no-store' });
+    DATA = await r.json();
+  } catch (e) {
+    DATA = { ok: false, error: '连不上本地服务：' + e.message };
+  }
+  render();
+}
+
+async function doSync() {
+  const btn = $('btnSync');
+  btn.disabled = true;
+  btn.textContent = '同步中…';
+  try {
+    const r = await fetch('/api/sync', { method: 'POST' });
+    if (r.status === 409) toast('已经有一个同步在跑');
+    for (let i = 0; i < 200; i++) {
+      await new Promise((res) => setTimeout(res, 1200));
+      const s = await (await fetch('/api/sync')).json();
+      if (!s.running) {
+        toast(s.message || (s.ok ? '同步完成' : '同步失败'));
+        break;
+      }
+    }
+    await load();
+  } catch (e) {
+    toast('同步失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '同步墨墨';
+  }
+}
+
+$('btnSync').addEventListener('click', doSync);
+$('q').addEventListener('input', render);
+$('sort').addEventListener('change', render);
+$('chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  [...$('chips').children].forEach((c) => c.classList.remove('on'));
+  chip.classList.add('on');
+  filter = chip.dataset.f;
+  render();
+});
+
+load();
+</script>
+</body>
+</html>
