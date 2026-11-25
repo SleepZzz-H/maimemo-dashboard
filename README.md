@@ -42,24 +42,48 @@ npm install -g @maimemo/memo-api
 # 3. 建基线（第一次只记录当前状态，不产生事件）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 
-# 4. 启动看板
-node .\app\server.mjs
-# 或者双击 app\start.cmd
-
-# 5. 打开
-#    http://localhost:8787
+# 4. 双击 install.cmd —— 装图标、装开机自启、顺手把服务跑起来
 ```
+
+`install.cmd` 会做四件事：
+
+1. 生成图标（`app\icons\favicon.ico`，多尺寸，桌面和任务栏都清楚）
+2. 在**桌面**和**开始菜单**放「墨墨难词看板」图标，双击即开（服务没启动会在后台自动拉起，不弹命令行窗口）
+3. 在**启动**文件夹放一个后台自启项，开机后服务自动在后台待命
+4. 立刻启动服务并自检，告诉你本机访问地址
+
+卸载：双击 `uninstall.cmd`（删图标、停服务，数据留着）。
+临时停一下服务：`app\stop.cmd`。
+
+## 手机上也有图标
+
+1. 手机和电脑连同一个 Wi-Fi
+2. 浏览器打开 `http://<电脑局域网IP>:8787`（装完 `install.cmd` 会直接打印地址）
+3. Android Chrome：右上角 **⋮** →「添加到主屏幕」；iPhone Safari：分享 →「添加到主屏幕」
+
+加完之后就是一张全屏图标，点开和 App 一样（页面带 `manifest.webmanifest`，所以是独立窗口而不是浏览器标签）。
+手机打不开，多半是防火墙或校园网隔离：右键「以管理员身份运行」`app\allow-lan.cmd` 放行 8787 端口。
 
 ## 目录结构
 
 ```
 .
+├── install.cmd           # 一键安装：图标 + 开机自启 + 启动服务
+├── uninstall.cmd         # 卸载图标和自启（数据保留）
 ├── memo-history.ps1      # 抓取 + 差分 + 统计（snapshot / report / status）
 ├── app/
-│   ├── server.mjs        # 零依赖 Node 服务：/api/data、/api/sync
+│   ├── server.mjs        # 零依赖 Node 服务：/api/data、/api/sync、/api/health、/api/lan
 │   ├── index.html        # 单页界面（内联 CSS/JS，无外部依赖）
-│   ├── start.cmd         # 启动看板
+│   ├── manifest.webmanifest
+│   ├── icons/            # 16–256 px 的 ico + 各尺寸 png（PWA / 桌面图标共用）
+│   ├── open-dashboard.ps1# 起服务 + 开浏览器（无窗口）
+│   ├── launch.vbs        # 桌面图标指向它
+│   ├── autostart.vbs     # 开机自启指向它（只起服务，不开浏览器）
+│   ├── start.cmd         # 前台带日志启动（排查问题用）
+│   ├── stop.cmd          # 停掉后台服务
 │   └── allow-lan.cmd     # 需要时放行 8787 端口（要管理员）
+├── tools/
+│   └── make-icons.ps1    # 重新生成图标
 ├── docs/
 │   └── maimemo-api-notes.md
 ├── state.json            # 运行时生成，不进仓库

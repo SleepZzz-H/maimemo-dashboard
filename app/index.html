@@ -4,7 +4,15 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0f1115" />
+<meta name="description" content="墨墨背单词本地快照看板：看看哪些词最容易忘" />
 <title>墨墨难词看板</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="难词看板" />
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   :root {
@@ -26,6 +34,20 @@
   button:active { transform: scale(.97); }
   button.primary { background: linear-gradient(180deg,#3f5bd8,#3348b8); border-color: #3a51c9; }
   button[disabled] { opacity: .55; cursor: default; }
+  button.ghost { background: transparent; border-color: var(--line); color: var(--dim); padding: 9px 11px; }
+  .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,.62); }
+  .modal.on { display: flex; }
+  .sheet { width: 100%; max-width: 520px; background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 16px 16px 0 0; padding: 18px 18px 24px; max-height: 86vh; overflow: auto; }
+  @media (min-width: 640px) { .modal { align-items: center; } .sheet { border-radius: 16px; } }
+  .sheet h3 { margin: 0 0 10px; font-size: 16px; }
+  .sheet p.sec { margin: 14px 0 4px; font-size: 13px; color: var(--accent); font-weight: 600; }
+  .sheet ul { margin: 0; padding-left: 18px; color: #cfd6e4; font-size: 13.5px; line-height: 1.75; }
+  .sheet .urlbox { display: flex; gap: 8px; margin-top: 14px; }
+  .sheet input { font: inherit; flex: 1; min-width: 0; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .sheet .close { width: 100%; margin-top: 14px; }
   main { max-width: 880px; margin: 0 auto; padding: 14px 16px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
   .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
@@ -81,6 +103,7 @@
     <div class="title">墨墨难词看板<span id="syncAt">加载中…</span></div>
     <div class="spacer"></div>
     <button id="btnSync" class="primary">同步墨墨</button>
+    <button id="btnInstall" class="ghost" title="怎么变成桌面/主屏图标">图标</button>
   </div>
 </header>
 
@@ -125,6 +148,28 @@
 </footer>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h3>把看板变成一个图标</h3>
+    <p class="sec">电脑</p>
+    <ul>
+      <li>桌面或开始菜单里的<b>「墨墨难词看板」</b>图标，双击就打开，服务没开会自动在后台拉起。</li>
+      <li>开机也会自动在后台跑起来，不用再管命令行窗口。</li>
+    </ul>
+    <p class="sec">手机（和电脑连同一个 Wi-Fi）</p>
+    <ul>
+      <li>Android Chrome：右上角 <b>⋮</b> → 「添加到主屏幕」。</li>
+      <li>iPhone Safari：底部 <b>分享</b> → 「添加到主屏幕」。</li>
+      <li>加完之后就有一张全屏的图标，点开即用。</li>
+    </ul>
+    <div class="urlbox">
+      <input id="lanUrl" readonly />
+      <button id="btnCopy">复制</button>
+    </div>
+    <button class="close" id="btnClose">关闭</button>
+  </div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -273,6 +318,37 @@ async function doSync() {
 }
 
 $('btnSync').addEventListener('click', doSync);
+
+const modal = $('modal');
+async function fillUrl() {
+  const box = $('lanUrl');
+  box.value = location.origin;
+  try {
+    const info = await (await fetch('/api/lan')).json();
+    const local = ['localhost', '127.0.0.1', '::1', '[::1]'];
+    if (local.includes(location.hostname) && info.addresses && info.addresses.length) {
+      box.value = 'http://' + info.addresses[0].address + ':' + info.port;
+    }
+  } catch {
+    /* 拿不到局域网地址就保持当前 origin */
+  }
+}
+$('btnInstall').addEventListener('click', () => {
+  modal.classList.add('on');
+  fillUrl();
+});
+$('btnClose').addEventListener('click', () => modal.classList.remove('on'));
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('on'); });
+$('btnCopy').addEventListener('click', async () => {
+  const box = $('lanUrl');
+  box.select();
+  try {
+    await navigator.clipboard.writeText(box.value);
+    toast('地址已复制');
+  } catch {
+    try { document.execCommand('copy'); toast('地址已复制'); } catch { toast('请手动复制'); }
+  }
+});
 $('q').addEventListener('input', render);
 $('sort').addEventListener('change', render);
 $('chips').addEventListener('click', (e) => {

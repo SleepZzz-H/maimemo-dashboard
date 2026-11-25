@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -10,6 +11,24 @@ const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const EVENTS_FILE = path.join(DATA_DIR, 'events.jsonl');
 const SCRIPT = path.join(DATA_DIR, 'memo-history.ps1');
 const PORT = Number(process.env.PORT || 8787);
+
+const STATIC = {
+  '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
+  '/favicon.ico': ['icons/favicon.ico', 'image/x-icon'],
+  '/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png'],
+};
+
+function lanAddresses() {
+  const out = [];
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      if (a.address.startsWith('169.254.')) continue;
+      out.push({ iface: name, address: a.address });
+    }
+  }
+  return out;
+}
 
 const RESP = {
   FAMILIAR: '熟悉',
@@ -200,6 +219,9 @@ const server = http.createServer((req, res) => {
   const json = (code, obj) => send(code, 'application/json; charset=utf-8', JSON.stringify(obj));
 
   try {
+    if (url.pathname === '/api/health') {
+      return json(200, { ok: true, port: PORT, dataDir: DATA_DIR });
+    }
     if (url.pathname === '/api/data') {
       return json(200, buildData());
     }
@@ -214,8 +236,17 @@ const server = http.createServer((req, res) => {
       const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
       return send(200, 'text/html; charset=utf-8', html);
     }
-    if (url.pathname === '/favicon.ico') {
-      return send(204, 'image/x-icon', '');
+    if (url.pathname === '/api/lan') {
+      return json(200, { port: PORT, addresses: lanAddresses() });
+    }
+    let staticHit = STATIC[url.pathname];
+    if (!staticHit && url.pathname.startsWith('/icons/') && url.pathname.endsWith('.png')) {
+      staticHit = ['icons/' + path.basename(url.pathname), 'image/png'];
+    }
+    if (staticHit) {
+      const file = path.join(__dirname, staticHit[0]);
+      if (!fs.existsSync(file)) return json(404, { error: 'not found' });
+      return send(200, staticHit[1], fs.readFileSync(file));
     }
     return json(404, { error: 'not found' });
   } catch (err) {
