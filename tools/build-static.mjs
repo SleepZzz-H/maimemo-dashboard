@@ -1,5 +1,5 @@
 // 把看板生成成一个纯静态页面：数据直接内联进 HTML，不需要 node 服务。
-// 产物在 site/，推上去就能用 GitHub Pages 打开，或者把 index.html 单独发给别人。
+// 产物在 docs/，推上去就能用 GitHub Pages 打开，或者把 index.html 单独发给别人。
 //
 // 用法：node tools/build-static.mjs [--data-dir <目录>] [--out <目录>]
 
@@ -17,7 +17,7 @@ function argOf(name, fallback) {
 }
 
 const DATA_DIR = path.resolve(argOf('--data-dir', ROOT));
-const OUT = path.resolve(argOf('--out', path.join(ROOT, 'site')));
+const OUT = path.resolve(argOf('--out', path.join(ROOT, 'docs')));
 const APP = path.join(ROOT, 'app');
 
 const data = buildData(DATA_DIR);

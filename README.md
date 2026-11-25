@@ -83,8 +83,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\memo-history.ps1 snapshot
 │   ├── stop.cmd          # 停掉后台服务
 │   └── allow-lan.cmd     # 需要时放行 8787 端口（要管理员）
 ├── tools/
-│   └── make-icons.ps1    # 重新生成图标
-├── docs/
+│   ├── make-icons.ps1    # 重新生成图标
+│   └── build-static.mjs  # 生成静态版（docs/，给 GitHub Pages 用）
+├── docs/                 # 静态版产物，GitHub Pages 从这里发布
+│   └── index.html        # 数据内联的单页，可以单独发给别人
+├── notes/
 │   └── maimemo-api-notes.md
 ├── state.json            # 运行时生成，不进仓库
 └── events.jsonl          # 运行时生成，不进仓库
