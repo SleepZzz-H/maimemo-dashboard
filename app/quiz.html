@@ -75,11 +75,9 @@
 
   button.ghost { background: transparent; border-color: var(--line); color: var(--dim); padding: 8px 12px; font-size: 13.5px; white-space: nowrap; flex: 0 0 auto; }
   button.ghost:hover { color: var(--text); }
-  @media (max-width: 520px) { #btnAccount { padding: 8px 9px; font-size: 12.5px; } }
   .modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: flex-end; justify-content: center;
     background: rgba(0,0,0,.62); padding: 0; }
   .modal.on { display: flex; }
-  #memoModal { z-index: 70; }
   .sheet { width: 100%; max-width: 520px; background: var(--panel2); border: 1px solid var(--line);
     border-radius: 16px 16px 0 0; padding: 18px 18px 22px; max-height: 88vh; overflow: auto; }
   @media (min-width: 640px) { .modal { align-items: center; } .sheet { border-radius: 16px; } }
@@ -114,7 +112,6 @@
     <a class="back" href="index.html" title="回到看板">←</a>
     <div class="title">每日测验<span id="dateLabel"></span></div>
     <div class="spacer"></div>
-    <button id="btnAccount" class="ghost" hidden>登录同步</button>
     <select id="mode" title="出题方向">
       <option value="mixed">混合方向</option>
       <option value="en2cn">英 → 中</option>
@@ -123,82 +120,7 @@
   </div>
 </header>
 
-<div class="modal" id="memoModal">
-  <div class="sheet">
-    <h3>绑定你的墨墨账号</h3>
-    <p class="hintline">填一个墨墨开放 API 的 Token，就能把你墨墨里正在背的词拿来自测，题目按你自己的复习次数和遗忘情况挑。</p>
-    <label class="field"><span>墨墨 API Token</span><input id="memoToken" type="password" autocomplete="off" spellcheck="false" placeholder="32 或 64 位十六进制" /></label>
-    <div class="autherr" id="memoErr"></div>
-    <div class="authrow">
-      <button type="button" class="primary" id="btnMemoGo">绑定并同步</button>
-      <button type="button" class="ghost" id="btnCloseMemo">取消</button>
-    </div>
-    <p class="tiny">Token 只存在你自己的浏览器里（登录后也会存进你的云端账号）；本站不保存你的墨墨密码，也拿不到。没有 Token 的话去 open.maimemo.com 免费申请一个。</p>
-  </div>
-</div>
-
 <main id="main"></main>
-
-<div class="modal" id="authModal">
-  <div class="sheet">
-    <h3 id="authTitle">登录，进度存云端</h3>
-    <p class="hintline" id="authHint">登录后换手机、换电脑都接着做；朋友注册自己的账号，各存各的进度。</p>
-    <form id="authForm" autocomplete="on">
-      <label class="field"><span>邮箱</span><input id="email" type="email" required placeholder="you@example.com" autocomplete="username" /></label>
-      <label class="field"><span>密码</span><input id="password" type="password" required minlength="6" placeholder="至少 6 位" autocomplete="current-password" /></label>
-      <div class="autherr" id="authErr"></div>
-      <div class="authrow">
-        <button type="submit" class="primary" id="btnSubmit">登录</button>
-        <button type="button" id="btnSwitch">没有账号？注册</button>
-        <button type="button" class="ghost" id="btnCloseAuth">以后再说</button>
-      </div>
-    </form>
-    <div id="authConfirm" hidden>
-      <p class="hintline" id="confirmText"></p>
-      <label class="field"><span>邮件里的验证码</span><input id="otp" inputmode="numeric" autocomplete="one-time-code" placeholder="邮件里那串数字，没有就点链接" /></label>
-      <div class="autherr" id="confirmErr"></div>
-      <div class="authrow">
-        <button type="button" class="primary" id="btnVerify">验证并登录</button>
-        <button type="button" id="btnResend">重发邮件</button>
-        <button type="button" class="ghost" id="btnCloseAuth2">关闭</button>
-      </div>
-    </div>
-    <p class="tiny">只用邮箱+密码，不收集别的。密码由 Supabase 保存，本站只存登录凭证。</p>
-  </div>
-</div>
-
-<div class="modal" id="accModal">
-  <div class="sheet">
-    <h3>账号</h3>
-    <div id="accBody">
-      <p class="hintline" id="accWho"></p>
-      <p class="tiny" id="accSync"></p>
-      <div class="authrow">
-        <button type="button" id="btnSyncNow">立即同步</button>
-        <button type="button" id="btnSignOut">退出登录</button>
-        <span class="grow"></span>
-        <button type="button" class="ghost" id="btnCloseAcc">关闭</button>
-      </div>
-    </div>
-    <div id="accGuest">
-      <p class="tiny">没登录：答题进度只存在这台设备上，换手机、换电脑都看不到。用邮箱注册一个账号（不绑定手机号），进度就存到云上，走到哪接着做。</p>
-      <div class="authrow">
-        <button type="button" class="primary" id="btnGoAuth">登录 / 注册</button>
-        <span class="grow"></span>
-        <button type="button" class="ghost" id="btnCloseAcc2">关闭</button>
-      </div>
-    </div>
-
-    <div class="memosep"></div>
-    <h4>墨墨背单词</h4>
-    <p class="tiny" id="memoWho">还没绑定：现在用的是通用的 1839 个词。</p>
-    <div class="authrow">
-      <button type="button" class="primary" id="btnMemoBind">绑定墨墨账号</button>
-      <button type="button" id="btnMemoSync" hidden>重新同步词库</button>
-      <button type="button" class="ghost" id="btnMemoUnbind" hidden>解绑</button>
-    </div>
-  </div>
-</div>
 
 <script src="config.js"></script>
 <script src="cloud.js"></script>
@@ -352,23 +274,6 @@ function paintSync() {
   el.textContent = map[pushState] || '';
 }
 
-function shortName(email) {
-  const s = String(email || '已登录').split('@')[0] || '已登录';
-  return s.length > 12 ? s.slice(0, 12) + '…' : s;
-}
-
-function paintAccount() {
-  const btn = $('btnAccount');
-  if (!btn) return;
-  if (!window.Cloud || !Cloud.configured()) { btn.hidden = true; return; }
-  btn.hidden = false;
-  btn.textContent = ACCOUNT ? shortName(ACCOUNT.email) : '登录同步';
-  $('accBody').hidden = !ACCOUNT;
-  $('accGuest').hidden = !!ACCOUNT;
-  $('accWho').textContent = ACCOUNT ? ACCOUNT.email : '';
-  paintSync();
-}
-
 async function pullAndMerge() {
   if (!ACCOUNT) return false;
   let remoteQuiz = null;
@@ -400,11 +305,9 @@ async function pullAndMerge() {
 
 async function cloudInit() {
   if (!window.Cloud || !Cloud.configured()) return;
-  $('btnAccount').hidden = false;
   await Cloud.adoptHash(); // 从确认邮件的链接回来时，接住 URL 里的 session
-  Cloud.onChange((u) => { ACCOUNT = u; paintAccount(); });
+  Cloud.onChange((u) => { ACCOUNT = u; });
   ACCOUNT = Cloud.user();
-  paintAccount();
   if (ACCOUNT) { DAYS = readLocal(); await pullAndMerge(); }
 }
 
@@ -825,10 +728,6 @@ function practiceWrong() {
 
 document.addEventListener('keydown', (e) => {
   const tag = (e.target && e.target.tagName) || '';
-  if (e.key === 'Escape') {
-    ['authModal', 'accModal', 'memoModal'].forEach((id) => { const el = $(id); if (el) el.classList.remove('on'); });
-    return;
-  }
   // 在输入框里打字时不要抢 1-4 / Enter（否则密码里的数字会当成选项）
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (cur && !locked && e.key >= '1' && e.key <= '4') answer(Number(e.key) - 1);
@@ -846,202 +745,6 @@ $('mode').addEventListener('change', () => {
   persist(); render();
 });
 
-// —— 账号界面 ——
-let authMode = 'login';
-
-function zhErr(err) {
-  const m = String((err && err.message) || err || '');
-  if (/Invalid login credentials/i.test(m)) return '邮箱或密码不对';
-  if (/User already registered/i.test(m)) return '这个邮箱已经注册过了，直接登录就行';
-  if (/Email not confirmed/i.test(m)) return '邮箱还没确认：点邮件里的链接，或把邮件里的验证码填进来';
-  if (/rate limit/i.test(m)) return '邮件发得太频繁了（Supabase 免费版每小时只允许几封），过一会儿再试，或直接用密码登录';
-  if (/at least 6 characters/i.test(m)) return '密码至少 6 位';
-  if (/Unable to validate email/i.test(m)) return '邮箱格式不对';
-  if (/Failed to fetch|Load failed|NetworkError/i.test(m)) return '连不上云端服务：检查 config.js 里的 URL，或换个网络';
-  return m || '出错了，再试一次';
-}
-
-function openAuth(mode) {
-  authMode = mode || 'login';
-  $('authErr').textContent = '';
-  hideConfirm();
-  syncAuthUI();
-  $('authModal').classList.add('on');
-  setTimeout(() => $('email').focus(), 50);
-}
-function syncAuthUI() {
-  const login = authMode === 'login';
-  $('authTitle').textContent = login ? '登录，进度存云端' : '注册一个账号';
-  $('btnSubmit').textContent = login ? '登录' : '注册';
-  $('btnSwitch').textContent = login ? '没有账号？注册' : '已有账号？登录';
-  $('password').autocomplete = login ? 'current-password' : 'new-password';
-}
-
-$('btnAccount').addEventListener('click', () => {
-  if (!window.Cloud || !Cloud.configured()) return;
-  paintAccount();
-  $('accModal').classList.add('on');
-});
-$('btnGoAuth').addEventListener('click', () => {
-  $('accModal').classList.remove('on');
-  syncAuthUI();
-  openAuth('login');
-});
-$('btnCloseAcc2').addEventListener('click', () => $('accModal').classList.remove('on'));
-$('btnSwitch').addEventListener('click', () => { authMode = authMode === 'login' ? 'signup' : 'login'; syncAuthUI(); });
-$('btnCloseAuth').addEventListener('click', () => $('authModal').classList.remove('on'));
-$('btnCloseAcc').addEventListener('click', () => $('accModal').classList.remove('on'));
-$('authModal').addEventListener('click', (e) => { if (e.target.id === 'authModal') $('authModal').classList.remove('on'); });
-$('accModal').addEventListener('click', (e) => { if (e.target.id === 'accModal') $('accModal').classList.remove('on'); });
-
-$('authForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = $('email').value.trim();
-  const pw = $('password').value;
-  $('authErr').textContent = '';
-  if (!window.Cloud || !Cloud.configured()) { $('authErr').textContent = '云同步还没配置（app/config.js 里缺 url / anonKey）。'; return; }
-  $('btnSubmit').disabled = true;
-  try {
-    if (authMode === 'login') {
-      await Cloud.signIn(email, pw);
-    } else {
-      const r = await Cloud.signUp(email, pw, location.origin + location.pathname);
-      if (r && r.needConfirm) { showConfirm(email); return; }
-    }
-    ACCOUNT = Cloud.user();
-    $('authModal').classList.remove('on');
-    hideConfirm();
-    DAYS = readLocal(); // 换成这个账号自己的本地进度
-    paintAccount();
-    const merged = await pullAndMerge();
-    loadMemo();
-    await makeToday();
-    render();
-    toast(merged ? '已登录，云端进度已合并' : '已登录，进度会存到云端');
-  } catch (err) {
-    $('authErr').textContent = zhErr(err);
-  } finally {
-    $('btnSubmit').disabled = false;
-  }
-});
-
-// 注册后项目要求点邮件确认：这里给两条路——点链接自动回来，或直接填验证码
-function showConfirm(email) {
-  $('confirmErr').textContent = '';
-  $('confirmText').dataset.email = email;
-  $('confirmText').textContent = '确认邮件已发到 ' + email + '。点邮件里的链接就会自动登录回来；邮件里如果有一串数字，填在下面也行。';
-  $('authForm').hidden = true;
-  $('authConfirm').hidden = false;
-  setTimeout(() => $('otp').focus(), 60);
-}
-function hideConfirm() {
-  $('authForm').hidden = false;
-  $('authConfirm').hidden = true;
-  $('otp').value = '';
-}
-$('btnVerify').addEventListener('click', async () => {
-  const email = $('confirmText').dataset.email || $('email').value.trim();
-  const code = ($('otp').value || '').replace(/\D/g, '');
-  if (!code) { $('confirmErr').textContent = '先把邮件里那串数字填上'; return; }
-  $('btnVerify').disabled = true;
-  $('confirmErr').textContent = '';
-  try {
-    await Cloud.verifyCode(email, code);
-    ACCOUNT = Cloud.user();
-    $('authModal').classList.remove('on');
-    hideConfirm();
-    DAYS = readLocal(); paintAccount();
-    await pullAndMerge();
-    loadMemo();
-    await makeToday(); render();
-    toast('邮箱已验证，进度会存到云端');
-  } catch (err) {
-    $('confirmErr').textContent = zhErr(err);
-  } finally {
-    $('btnVerify').disabled = false;
-  }
-});
-$('btnResend').addEventListener('click', async () => {
-  const email = $('confirmText').dataset.email;
-  try { await Cloud.resend(email); $('confirmErr').textContent = '已重发，稍等一会儿查收（也看看垃圾箱）'; }
-  catch (err) { $('confirmErr').textContent = zhErr(err); }
-});
-$('btnCloseAuth2').addEventListener('click', () => { $('authModal').classList.remove('on'); hideConfirm(); });
-
-$('btnSyncNow').addEventListener('click', async () => {
-  await doPush();
-  toast(pushState === 'saved' ? '已同步' : '同步失败，检查网络后重试');
-});
-$('btnSignOut').addEventListener('click', () => {
-  Cloud.signOut();
-  ACCOUNT = null;
-  clearTimeout(pushTimer);
-  pushFor = '';
-  DAYS = readLocal(); // 回到游客进度
-  $('accModal').classList.remove('on');
-  paintAccount();
-  loadMemo();
-  makeToday().then(render);
-  toast('已退出，进度还在本机');
-});
-
-function resetToday() {
-  // 词库换了，今天这一组就作废，重新抽
-  delete DAYS[todayStr()];
-  setNo = 1;
-  persist();
-}
-
-// —— 绑定墨墨账号的界面 ——
-function openMemo() {
-  $('accModal').classList.remove('on');   // 账号面板先收起来，否则它压在绑定弹窗上面
-  $('memoErr').textContent = '';
-  if (MEMO && MEMO.token) $('memoToken').value = MEMO.token;
-  $('memoModal').classList.add('on');
-  setTimeout(() => $('memoToken').focus(), 50);
-}
-function closeMemo(back) {
-  $('memoModal').classList.remove('on');
-  if (back !== false && window.Cloud && Cloud.configured()) {
-    paintAccount();
-    $('accModal').classList.add('on');
-  }
-}
-$('btnMemoBind').addEventListener('click', openMemo);
-$('btnMemoSync').addEventListener('click', openMemo);
-$('btnCloseMemo').addEventListener('click', () => closeMemo());
-$('memoModal').addEventListener('click', (e) => { if (e.target.id === 'memoModal') closeMemo(); });
-
-$('btnMemoGo').addEventListener('click', async () => {
-  const t = ($('memoToken').value || '').trim();
-  $('memoErr').textContent = '';
-  $('btnMemoGo').disabled = true;
-  $('btnMemoGo').textContent = '同步中…';
-  try {
-    const n = await syncMemo(t);
-    closeMemo();
-    toast(`已绑定，拿到 ${n} 个词`);
-    resetToday();
-    await makeToday();
-    render();
-  } catch (err) {
-    $('memoErr').textContent = err.message || String(err);
-  } finally {
-    $('btnMemoGo').disabled = false;
-    $('btnMemoGo').textContent = '绑定并同步';
-  }
-});
-
-$('btnMemoUnbind').addEventListener('click', () => {
-  MEMO = null;
-  saveMemo();
-  POOL = DISTRACT.slice();
-  resetToday();
-  $('accModal').classList.remove('on');
-  toast('已解绑，回到通用词库');
-  makeToday().then(render);
-});
-
 async function init() {
   DAYS = readLocal();
   if (STATIC) {
@@ -1056,16 +759,25 @@ async function init() {
       return;
     }
   }
-  if (!POOL.length) {
-    $('main').innerHTML = '<div class="card">词库是空的。先在电脑上跑一次 <code>tools/fetch-glosses.mjs</code> 生成中文释义。</div>';
-    return;
-  }
   DISTRACT = POOL.slice();
   loadGloss();
   await cloudInit();
   loadMemo();
+  // 这个测验只练「你自己的墨墨词库」，没绑定就不放题
+  if (!MEMO) { renderGate(); return; }
   await makeToday();
   render();
+}
+
+function renderGate() {
+  $('dateLabel').textContent = '';
+  $('main').innerHTML = `
+    <div class="card center">
+      <div class="big">先绑定墨墨账号</div>
+      <p class="hintline">这个测验只练你自己墨墨里正在背的词——没绑定就没有题。</p>
+      <p class="hintline">回首页点右上角 <b>绑定墨墨</b>，把开放 API 的 Token 贴进去（一次就好，之后自动同步）。</p>
+      <p style="margin-top:16px"><a class="primary" href="index.html" style="display:inline-block;padding:11px 20px;border-radius:10px;background:var(--accent);color:#fff;font-weight:600">回首页去绑定 →</a></p>
+    </div>`;
 }
 
 init();

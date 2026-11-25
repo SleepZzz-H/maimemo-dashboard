@@ -99,6 +99,12 @@
   .autherr { color: var(--bad); font-size: 12.5px; min-height: 16px; margin: 2px 0 10px; }
   .authrow { display: flex; gap: 8px; }
   .authrow .grow { flex: 1; }
+  .sep { height: 1px; background: #2b3244; margin: 16px 0 14px; }
+  .sheet h4 { font-size: 13px; color: #9aa3b8; font-weight: 600; margin: 0 0 8px; letter-spacing: .04em; }
+  .tip.tiny { font-size: 11.5px; color: #6b7488; margin-top: 10px; }
+  a.primary { display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+    color: #fff; font-weight: 600; background: linear-gradient(180deg,#3f5bd8,#3348b8);
+    border: 1px solid #3a51c9; border-radius: 10px; padding: 9px 14px; }
   .cn { color: var(--dim); font-size: 13px; line-height: 1.5; margin-top: 5px; }
   .more { color: var(--dim); font-size: 12.5px; text-align: center; padding: 14px 6px 4px; }
   @media (max-width: 520px) {
@@ -117,7 +123,6 @@
     <a id="btnQuiz" class="ghost linkbtn" href="quiz.html" title="每天 50 个词，四选一测验">测验</a>
     <button id="btnAccount" class="ghost">登录</button>
     <button id="btnSync" class="primary">同步墨墨</button>
-    <button id="btnInstall" class="ghost" title="怎么变成桌面/主屏图标">图标</button>
   </div>
 </header>
 
@@ -163,28 +168,6 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="modal" id="modal">
-  <div class="sheet">
-    <h3>把看板变成一个图标</h3>
-    <p class="sec">电脑</p>
-    <ul id="ulPc">
-      <li>桌面或开始菜单里的<b>「墨墨难词看板」</b>图标，双击就打开，服务没开会自动在后台拉起。</li>
-      <li>开机也会自动在后台跑起来，不用再管命令行窗口。</li>
-    </ul>
-    <p class="sec" id="secPhone">手机（和电脑连同一个 Wi-Fi）</p>
-    <ul id="ulPhone">
-      <li>Android Chrome：右上角 <b>⋮</b> → 「添加到主屏幕」。</li>
-      <li>iPhone Safari：底部 <b>分享</b> → 「添加到主屏幕」。</li>
-      <li>加完之后就多一张图标，点开即用。</li>
-    </ul>
-    <div class="urlbox">
-      <input id="lanUrl" readonly />
-      <button id="btnCopy">复制</button>
-    </div>
-    <button class="close" id="btnClose">关闭</button>
-  </div>
-</div>
-
 <div class="modal top" id="authModal">
   <div class="sheet">
     <h3 id="authTitle">登录</h3>
@@ -203,12 +186,44 @@
 <div class="modal top" id="accModal">
   <div class="sheet">
     <h3>账号</h3>
-    <p class="tip" id="accWho">—</p>
-    <div class="authrow">
-      <a class="ghost linkbtn grow" href="quiz.html" id="btnGoQuiz">去测验</a>
-      <button class="ghost" id="btnSignOut">退出登录</button>
+    <div id="accGuest">
+      <p class="tip">没登录：训练进度只存在这台设备。登录后进度存云端，手机电脑共用一份。</p>
+      <div class="authrow">
+        <button class="primary grow" id="btnGoAuth">登录 / 注册</button>
+      </div>
     </div>
-    <button class="close" id="btnAccClose">关闭</button>
+    <div id="accBody" hidden>
+      <p class="tip" id="accWho">—</p>
+      <div class="authrow">
+        <button class="ghost grow" id="btnSignOut">退出登录</button>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    <h4>墨墨背单词</h4>
+    <p class="tip" id="memoWho">还没绑定：先绑定才能开始每日测验。</p>
+
+    <div id="memoForm">
+      <div class="field"><input id="memoToken" type="password" placeholder="墨墨开放 API Token" autocomplete="off" spellcheck="false" /></div>
+      <div class="autherr" id="memoErr"></div>
+      <div class="authrow">
+        <button class="primary grow" id="btnMemoGo">绑定并同步</button>
+      </div>
+      <p class="tip tiny">Token 只存在这台设备的浏览器里；本站不碰你的墨墨密码。没有 Token 去 open.maimemo.com 免费申请。</p>
+    </div>
+
+    <div id="memoBound" hidden>
+      <div class="authrow">
+        <button class="grow" id="btnMemoRe">重新同步</button>
+        <button class="ghost" id="btnMemoUnbind">解绑</button>
+      </div>
+      <p class="tip tiny" id="memoAt"></p>
+    </div>
+
+    <div class="authrow" style="margin-top:12px">
+      <a class="primary grow" href="quiz.html" id="btnGoQuiz2">开始测验 →</a>
+      <button class="ghost" id="btnAccClose">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -381,49 +396,9 @@ async function doSync() {
 $('btnSync').addEventListener('click', doSync);
 
 if (STATIC) {
-  $('btnSync').hidden = true;
-  document.querySelector('.sheet h3').textContent = '把看板加到主屏幕';
-  $('secPhone').textContent = '手机（不需要和电脑同一网络）';
-  $('ulPc').innerHTML =
-    '<li>把上面的网址存成书签，换任何一台电脑都能直接打开。</li>' +
-    '<li>这是生成那一刻的数据快照，想更新就在电脑上重新生成一次。</li>';
-  $('ulPhone').innerHTML =
-    '<li>Android Chrome：右上角 <b>⋮</b> → 「添加到主屏幕」。</li>' +
-    '<li>iPhone Safari：底部 <b>分享</b> → 「添加到主屏幕」。</li>' +
-    '<li>点开就是一张独立图标，和本地版长得一样。</li>';
+  $('btnSync').hidden = true;   // 静态版没有后端可调，数据在构建时就写死了
 }
 
-const modal = $('modal');
-async function fillUrl() {
-  const box = $('lanUrl');
-  box.value = STATIC ? location.href : location.origin;
-  if (STATIC) return;
-  try {
-    const info = await (await fetch('/api/lan')).json();
-    const local = ['localhost', '127.0.0.1', '::1', '[::1]'];
-    if (local.includes(location.hostname) && info.addresses && info.addresses.length) {
-      box.value = 'http://' + info.addresses[0].address + ':' + info.port;
-    }
-  } catch {
-    /* 拿不到局域网地址就保持当前 origin */
-  }
-}
-$('btnInstall').addEventListener('click', () => {
-  modal.classList.add('on');
-  fillUrl();
-});
-$('btnClose').addEventListener('click', () => modal.classList.remove('on'));
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('on'); });
-$('btnCopy').addEventListener('click', async () => {
-  const box = $('lanUrl');
-  box.select();
-  try {
-    await navigator.clipboard.writeText(box.value);
-    toast('地址已复制');
-  } catch {
-    try { document.execCommand('copy'); toast('地址已复制'); } catch { toast('请手动复制'); }
-  }
-});
 $('q').addEventListener('input', render);
 $('sort').addEventListener('change', render);
 $('chips').addEventListener('click', (e) => {
@@ -460,23 +435,175 @@ function shortName(email) {
   return name.length > 10 ? name.slice(0, 10) + '…' : name;
 }
 
-function paintAccount() {
-  const btn = $('btnAccount');
-  if (!CLOUD_ON) {
-    btn.textContent = '登录';
-    btn.title = '还没配置云端（app/config.js 是空的）';
+// —— 墨墨账号绑定：测验的题库就来自这里 ——
+const MEMO_KEY = 'maimemo-memo-v1';
+const MEMO_API = (window.MEMO_QUIZ_CLOUD && window.MEMO_QUIZ_CLOUD.memoProxy) || '';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let MEMO = null;
+let lastCall = 0;
+
+function memoStoreKey() {
+  return ACCOUNT ? MEMO_KEY + ':u:' + ACCOUNT.id : MEMO_KEY + ':guest';
+}
+function readMemoOf(k) {
+  try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; }
+}
+function loadMemo() {
+  MEMO = readMemoOf(memoStoreKey());
+  if (!(MEMO && Array.isArray(MEMO.words) && MEMO.words.length)) MEMO = null;
+  paintMemo();
+}
+function saveMemo() {
+  try {
+    if (MEMO) localStorage.setItem(memoStoreKey(), JSON.stringify(MEMO));
+    else localStorage.removeItem(memoStoreKey());
+  } catch { /* 存不下也不影响这次 */ }
+  paintMemo();
+}
+// 登录后把「游客身份绑的那份」接过来，省得再绑一次
+function adoptGuestMemo() {
+  if (!ACCOUNT || readMemoOf(memoStoreKey())) return false;
+  const g = readMemoOf(MEMO_KEY + ':guest');
+  if (!(g && Array.isArray(g.words) && g.words.length)) return false;
+  try { localStorage.setItem(memoStoreKey(), JSON.stringify(g)); } catch {}
+  return true;
+}
+
+function paintMemo() {
+  if (!$('memoWho')) return;
+  const bound = !!(MEMO && MEMO.words && MEMO.words.length);
+  const canBind = !!MEMO_API;
+  $('memoForm').hidden = bound;
+  $('memoBound').hidden = !bound;
+  $('btnMemoGo').disabled = !canBind;
+  if (!bound) {
+    $('memoWho').textContent = canBind
+      ? '还没绑定：绑定之后才能开始每日测验。'
+      : '这个版本没配中转服务，绑定用不了。';
     return;
   }
-  if (ACCOUNT && ACCOUNT.email) {
-    btn.textContent = shortName(ACCOUNT.email);
-    btn.title = ACCOUNT.email + '（点开看账号）';
-  } else {
-    btn.textContent = '登录';
-    btn.title = '登录后做题进度存云端';
+  const d = new Date(MEMO.at || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  $('memoWho').textContent = `已绑定：${MEMO.words.length} 个词`;
+  $('memoAt').textContent = `最近同步 ${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())} · Token 只存在这台设备，换设备要再绑一次`;
+  $('btnMemoRe').disabled = !canBind;
+}
+
+async function memoApi(path, body, token) {
+  if (!MEMO_API) throw new Error('没有配置中转服务');
+  let r;
+  for (let attempt = 0; ; attempt++) {
+    // 墨墨限流挺严：宁可慢一点，也不要 429
+    const wait = 400 - (Date.now() - lastCall);
+    if (wait > 0) await sleep(wait);
+    lastCall = Date.now();
+    try {
+      r = await fetch(MEMO_API + '?act=api', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-memo-token': token },
+        body: JSON.stringify({ path: path, body: body || {} }),
+      });
+    } catch (e) {
+      throw new Error('连不上中转服务，检查网络或 config.js 里的 memoProxy');
+    }
+    if ((r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503) && attempt < 3) {
+      await sleep(2000 * (attempt + 1));
+      continue;
+    }
+    break;
   }
+  const j = await r.json().catch(() => null);
+  if (!j) throw new Error('中转服务返回了非 JSON（HTTP ' + r.status + '）');
+  if (r.status >= 400 || j.success === false) {
+    const errs = Array.isArray(j.errors) ? j.errors : [];
+    const code = (errs[0] && errs[0].code) || j.code || '';
+    const msg = (errs[0] && errs[0].msg) || j.msg || j.message || '';
+    if (/permission|auth|token|forbidden|invalid/i.test(code + ' ' + msg)) throw new Error('Token 好像不对，或者没有开放 API 权限');
+    if (r.status >= 500) throw new Error('墨墨服务端临时出错（HTTP ' + r.status + '），过几分钟再试');
+    throw new Error('墨墨返回 HTTP ' + r.status + (msg || code ? '：' + (msg || code) : ''));
+  }
+  return j;
+}
+
+function midIso(a, b) {
+  const t = (new Date(a).getTime() + new Date(b).getTime()) / 2;
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T00:00:00+08:00`;
+}
+
+// 墨墨一次最多给 1000 条，时间窗太宽就二分
+async function pullRecords(token) {
+  const out = [];
+  const seen = new Set();
+  const grab = async (s, e, depth) => {
+    const j = await memoApi(
+      '/open/api/v1/memo/study/query_study_records',
+      { voc_ids: [], spellings: [], as_count: false, limit: 1000, next_study_date: { start: s, end: e } },
+      token
+    );
+    const list = Array.isArray(j.records) ? j.records : Array.isArray((j.data || {}).records) ? j.data.records : [];
+    const spanDays = (new Date(e).getTime() - new Date(s).getTime()) / 86400000;
+    if (list.length >= 1000 && depth < 14 && spanDays > 2) {
+      const m = midIso(s, e);
+      await grab(s, m, depth + 1);
+      await grab(m, e, depth + 1);
+      return;
+    }
+    for (const r of list) {
+      if (r && r.voc_id && !seen.has(r.voc_id)) { seen.add(r.voc_id); out.push(r); }
+    }
+  };
+  await grab('2020-01-01T00:00:00+08:00', '2200-01-01T00:00:00+08:00', 0);
+  return out;
+}
+
+// 墨墨没有逐次遗忘记录，只能用「复习次数 + 最近一次回答 + 顽固标记」估个难度
+function memoScore(r) {
+  const lr = r.last_response || '';
+  const sticky = (r.tags || []).indexOf('STICKING') >= 0 ? 1 : 0;
+  let s = Math.min(r.study_count || 0, 20) * 0.35 + sticky * 2.5;
+  if (lr === 'FORGET') s += 5;
+  else if (lr === 'VAGUE') s += 3;
+  else if (lr === 'WELL_FAMILIAR') s -= 1;
+  return Math.round(s * 100) / 100;
+}
+
+async function syncMemo(token) {
+  token = String(token || '').trim();
+  if (!/^[0-9a-zA-Z]{20,}$/.test(token)) throw new Error('Token 看着不像（应该是 32 或 64 位字母数字）');
+  await memoApi('/open/api/v1/memo/study/get_study_progress', {}, token); // 顺便验 token
+  const recs = await pullRecords(token);
+  if (!recs.length) throw new Error('这个墨墨账号里没查到学习记录，先加几个词再试');
+  MEMO = {
+    token,
+    at: Date.now(),
+    words: recs
+      .filter((r) => r.voc_spelling)
+      .map((r) => ({
+        w: r.voc_spelling,
+        sc: r.study_count || 0,
+        lr: r.last_response || '',
+        st: (r.tags || []).indexOf('STICKING') >= 0 ? 1 : 0,
+        s: memoScore(r),
+      })),
+  };
+  saveMemo();
+  return MEMO.words.length;
+}
+
+function paintAccount() {
+  const btn = $('btnAccount');
+  btn.textContent = ACCOUNT && ACCOUNT.email ? shortName(ACCOUNT.email) : '登录';
+  btn.title = ACCOUNT ? ACCOUNT.email + '（点开看账号）' : '登录 / 绑定墨墨账号';
+  $('accGuest').hidden = !!ACCOUNT;
+  $('accBody').hidden = !ACCOUNT;
+  $('accWho').textContent = ACCOUNT ? ACCOUNT.email : '';
+  paintMemo();
 }
 
 function openAuth(mode) {
+  if (!CLOUD_ON) { toast('云端没配置，登录用不了；但绑定墨墨账号照样能用'); return; }
   authMode = mode || 'login';
   $('authErr').textContent = '';
   $('authTitle').textContent = authMode === 'login' ? '登录' : '注册';
@@ -523,12 +650,12 @@ async function submitAuth() {
 }
 
 $('btnAccount').addEventListener('click', () => {
-  if (!CLOUD_ON) { toast('还没配置云端，登录用不了'); return; }
-  if (ACCOUNT) {
-    $('accWho').textContent = ACCOUNT.email + '\n登录后，做题进度会同步到云端。';
-    $('accWho').style.whiteSpace = 'pre-line';
-    $('accModal').classList.add('on');
-  } else openAuth('login');
+  paintAccount();
+  $('accModal').classList.add('on');
+});
+$('btnGoAuth').addEventListener('click', () => {
+  $('accModal').classList.remove('on');
+  openAuth('login');
 });
 $('btnAuthGo').addEventListener('click', submitAuth);
 $('btnAuthSwitch').addEventListener('click', () => openAuth(authMode === 'login' ? 'signup' : 'login'));
@@ -538,9 +665,71 @@ $('pwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitAuth(
 $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('pwd').focus(); });
 $('accModal').addEventListener('click', (e) => { if (e.target === $('accModal')) $('accModal').classList.remove('on'); });
 $('btnAccClose').addEventListener('click', () => $('accModal').classList.remove('on'));
+
+// 绑定 / 重新同步 / 解绑
+$('btnMemoGo').addEventListener('click', async () => {
+  const t = ($('memoToken').value || '').trim();
+  const btn = $('btnMemoGo');
+  $('memoErr').textContent = '';
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '同步中…（约 20 秒）';
+  try {
+    const n = await syncMemo(t);
+    $('memoToken').value = '';
+    toast(`已绑定：拿到 ${n} 个词`);
+    paintMemo();
+  } catch (e) {
+    $('memoErr').textContent = e.message || String(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+$('btnMemoRe').addEventListener('click', async () => {
+  if (!MEMO || !MEMO.token) return;
+  const btn = $('btnMemoRe');
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '同步中…';
+  try {
+    const n = await syncMemo(MEMO.token);
+    toast(`已更新：${n} 个词`);
+    paintMemo();
+  } catch (e) {
+    toast('同步失败：' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+$('btnMemoUnbind').addEventListener('click', () => {
+  MEMO = null;
+  saveMemo();
+  toast('已解绑，测验会要求重新绑定');
+});
+
+// 没绑定就不让进测验
+$('btnQuiz').addEventListener('click', (e) => {
+  if (!MEMO) {
+    e.preventDefault();
+    paintAccount();
+    $('accModal').classList.add('on');
+    toast('先绑定墨墨账号，才能开始测验');
+  }
+});
+$('btnGoQuiz2').addEventListener('click', (e) => {
+  if (MEMO) return;
+  e.preventDefault();
+  toast('把 Token 填上、点「绑定并同步」，就能开始测验了');
+  $('memoToken').focus();
+});
+
 $('btnSignOut').addEventListener('click', async () => {
   try { await CLOUD.signOut(); } catch { /* 就算请求失败也把本地清掉 */ }
-  $('accModal').classList.remove('on');
+  ACCOUNT = null;
+  loadMemo();      // 回到游客身份绑的那份
+  paintAccount();
   toast('已退出登录');
 });
 
@@ -548,14 +737,20 @@ $('btnSignOut').addEventListener('click', async () => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   ['authModal', 'accModal'].forEach((id) => $(id).classList.remove('on'));
-  $('modal').classList.remove('on');
 });
 
 if (CLOUD) {
-  CLOUD.onChange((u) => { ACCOUNT = u; paintAccount(); });
+  CLOUD.onChange((u) => {
+    ACCOUNT = u;
+    if (ACCOUNT) adoptGuestMemo();
+    loadMemo();
+    paintAccount();
+  });
   const ready = CLOUD.adoptHash ? CLOUD.adoptHash() : Promise.resolve(false);
-  ready.then(() => { ACCOUNT = CLOUD.user(); paintAccount(); }).catch(() => paintAccount());
+  ready.then(() => { ACCOUNT = CLOUD.user(); if (ACCOUNT) adoptGuestMemo(); loadMemo(); paintAccount(); })
+    .catch(() => { loadMemo(); paintAccount(); });
 } else {
+  loadMemo();
   paintAccount();
 }
 
