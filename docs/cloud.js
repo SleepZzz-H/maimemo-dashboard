@@ -102,15 +102,61 @@
     return saveAuth(body);
   }
 
-  async function signUp(email, password) {
+  async function signUp(email, password, redirectTo) {
+    const payload = { email, password, data: { quiz: null } };
+    if (redirectTo) payload.email_redirect_to = redirectTo;
     const body = await call('/auth/v1/signup', {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ email, password, data: { quiz: null } }),
+      body: JSON.stringify(payload),
     });
     if (body && body.access_token) return saveAuth(body);
-    // 没开「关闭邮箱确认」时走到这里：账号建了，但要先点邮件里的确认链接
+    // 项目开着「Confirm email」时走到这里：账号建了，但要先点邮件里的确认链接 / 输入验证码
     return { needConfirm: true, user: body && body.user };
+  }
+
+  // 点邮件确认链接后，Supabase 会把 session 放在 URL 的 # 后面带回来；
+  // 页面加载时接住它，用户就不用手动登录第二次。
+  async function adoptHash() {
+    const h = (location.hash || '').replace(/^#/, '');
+    if (!h || h.indexOf('access_token=') < 0) return false;
+    const q = new URLSearchParams(h);
+    const at = q.get('access_token');
+    if (!at) return false;
+    const s = {
+      access_token: at,
+      refresh_token: q.get('refresh_token') || '',
+      expires_at: Date.now() + (Number(q.get('expires_in') || 3600) - 60) * 1000,
+      user: null,
+    };
+    writeSession(s);
+    try {
+      s.user = await call('/auth/v1/user', { headers: headers(at) });
+      writeSession(s);
+    } catch {}
+    try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+    notify();
+    return true;
+  }
+
+  // 邮件里的 6–8 位验证码（项目开了 Email OTP 时可用），确认后直接拿到 session。
+  async function verifyCode(email, code, type) {
+    const body = await call('/auth/v1/verify', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ type: type || 'signup', email, token: code }),
+    });
+    if (body && body.access_token) return saveAuth(body);
+    throw new Error('验证码无效或已过期');
+  }
+
+  async function resend(email) {
+    await call('/auth/v1/resend', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ type: 'signup', email }),
+    });
+    return true;
   }
 
   async function refresh() {
@@ -162,5 +208,8 @@
     return true;
   }
 
-  window.Cloud = { configured, user, signIn, signUp, signOut, pull, push, onChange, refresh };
+  window.Cloud = {
+    configured, user, signIn, signUp, signOut, pull, push, onChange, refresh,
+    adoptHash, verifyCode, resend,
+  };
 })();

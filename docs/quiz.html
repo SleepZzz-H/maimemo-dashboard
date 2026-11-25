@@ -137,6 +137,16 @@
         <button type="button" class="ghost" id="btnCloseAuth">以后再说</button>
       </div>
     </form>
+    <div id="authConfirm" hidden>
+      <p class="hintline" id="confirmText"></p>
+      <label class="field"><span>邮件里的验证码</span><input id="otp" inputmode="numeric" autocomplete="one-time-code" placeholder="邮件里那串数字，没有就点链接" /></label>
+      <div class="autherr" id="confirmErr"></div>
+      <div class="authrow">
+        <button type="button" class="primary" id="btnVerify">验证并登录</button>
+        <button type="button" id="btnResend">重发邮件</button>
+        <button type="button" class="ghost" id="btnCloseAuth2">关闭</button>
+      </div>
+    </div>
     <p class="tiny">只用邮箱+密码，不收集别的。密码由 Supabase 保存，本站只存登录凭证。</p>
   </div>
 </div>
@@ -347,6 +357,7 @@ async function pullAndMerge() {
 async function cloudInit() {
   if (!window.Cloud || !Cloud.configured()) return;
   $('btnAccount').hidden = false;
+  await Cloud.adoptHash(); // 从确认邮件的链接回来时，接住 URL 里的 session
   Cloud.onChange((u) => { ACCOUNT = u; paintAccount(); });
   ACCOUNT = Cloud.user();
   paintAccount();
@@ -584,7 +595,8 @@ function zhErr(err) {
   const m = String((err && err.message) || err || '');
   if (/Invalid login credentials/i.test(m)) return '邮箱或密码不对';
   if (/User already registered/i.test(m)) return '这个邮箱已经注册过了，直接登录就行';
-  if (/Email not confirmed/i.test(m)) return '邮箱还没确认：去点邮件里的链接，或在 Supabase 关掉「Confirm email」';
+  if (/Email not confirmed/i.test(m)) return '邮箱还没确认：点邮件里的链接，或把邮件里的验证码填进来';
+  if (/rate limit/i.test(m)) return '邮件发得太频繁了（Supabase 免费版每小时只允许几封），过一会儿再试，或直接用密码登录';
   if (/at least 6 characters/i.test(m)) return '密码至少 6 位';
   if (/Unable to validate email/i.test(m)) return '邮箱格式不对';
   if (/Failed to fetch|Load failed|NetworkError/i.test(m)) return '连不上云端服务：检查 config.js 里的 URL，或换个网络';
@@ -594,6 +606,8 @@ function zhErr(err) {
 function openAuth(mode) {
   authMode = mode || 'login';
   $('authErr').textContent = '';
+  hideConfirm();
+  syncAuthUI();
   $('authModal').classList.add('on');
   setTimeout(() => $('email').focus(), 50);
 }
@@ -627,14 +641,12 @@ $('authForm').addEventListener('submit', async (e) => {
     if (authMode === 'login') {
       await Cloud.signIn(email, pw);
     } else {
-      const r = await Cloud.signUp(email, pw);
-      if (r && r.needConfirm) {
-        $('authErr').textContent = '注册成功，但要先点邮件里的确认链接（或在 Supabase 关掉 Confirm email）。';
-        return;
-      }
+      const r = await Cloud.signUp(email, pw, location.origin + location.pathname);
+      if (r && r.needConfirm) { showConfirm(email); return; }
     }
     ACCOUNT = Cloud.user();
     $('authModal').classList.remove('on');
+    hideConfirm();
     DAYS = readLocal(); // 换成这个账号自己的本地进度
     paintAccount();
     const merged = await pullAndMerge();
@@ -647,6 +659,48 @@ $('authForm').addEventListener('submit', async (e) => {
     $('btnSubmit').disabled = false;
   }
 });
+
+// 注册后项目要求点邮件确认：这里给两条路——点链接自动回来，或直接填验证码
+function showConfirm(email) {
+  $('confirmErr').textContent = '';
+  $('confirmText').dataset.email = email;
+  $('confirmText').textContent = '确认邮件已发到 ' + email + '。点邮件里的链接就会自动登录回来；邮件里如果有一串数字，填在下面也行。';
+  $('authForm').hidden = true;
+  $('authConfirm').hidden = false;
+  setTimeout(() => $('otp').focus(), 60);
+}
+function hideConfirm() {
+  $('authForm').hidden = false;
+  $('authConfirm').hidden = true;
+  $('otp').value = '';
+}
+$('btnVerify').addEventListener('click', async () => {
+  const email = $('confirmText').dataset.email || $('email').value.trim();
+  const code = ($('otp').value || '').replace(/\D/g, '');
+  if (!code) { $('confirmErr').textContent = '先把邮件里那串数字填上'; return; }
+  $('btnVerify').disabled = true;
+  $('confirmErr').textContent = '';
+  try {
+    await Cloud.verifyCode(email, code);
+    ACCOUNT = Cloud.user();
+    $('authModal').classList.remove('on');
+    hideConfirm();
+    DAYS = readLocal(); paintAccount();
+    await pullAndMerge();
+    makeToday(); render();
+    toast('邮箱已验证，进度会存到云端');
+  } catch (err) {
+    $('confirmErr').textContent = zhErr(err);
+  } finally {
+    $('btnVerify').disabled = false;
+  }
+});
+$('btnResend').addEventListener('click', async () => {
+  const email = $('confirmText').dataset.email;
+  try { await Cloud.resend(email); $('confirmErr').textContent = '已重发，稍等一会儿查收（也看看垃圾箱）'; }
+  catch (err) { $('confirmErr').textContent = zhErr(err); }
+});
+$('btnCloseAuth2').addEventListener('click', () => { $('authModal').classList.remove('on'); hideConfirm(); });
 
 $('btnSyncNow').addEventListener('click', async () => {
   await doPush();
