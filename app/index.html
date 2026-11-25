@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#0f1115" />
 <meta name="description" content="墨墨背单词本地快照看板：看看哪些词最容易忘" />
 <title>墨墨难词看板</title>
-<link rel="manifest" href="/manifest.webmanifest" />
-<link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -153,12 +153,12 @@
   <div class="sheet">
     <h3>把看板变成一个图标</h3>
     <p class="sec">电脑</p>
-    <ul>
+    <ul id="ulPc">
       <li>桌面或开始菜单里的<b>「墨墨难词看板」</b>图标，双击就打开，服务没开会自动在后台拉起。</li>
       <li>开机也会自动在后台跑起来，不用再管命令行窗口。</li>
     </ul>
-    <p class="sec">手机（和电脑连同一个 Wi-Fi）</p>
-    <ul>
+    <p class="sec" id="secPhone">手机（和电脑连同一个 Wi-Fi）</p>
+    <ul id="ulPhone">
       <li>Android Chrome：右上角 <b>⋮</b> → 「添加到主屏幕」。</li>
       <li>iPhone Safari：底部 <b>分享</b> → 「添加到主屏幕」。</li>
       <li>加完之后就多一张图标，点开即用。</li>
@@ -173,6 +173,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+const STATIC = !!window.__STATIC_DATA__;   // 静态版：数据内联，没有后端
 let DATA = null;
 let filter = 'all';
 
@@ -284,6 +285,11 @@ function render() {
 }
 
 async function load() {
+  if (STATIC) {
+    DATA = window.__STATIC_DATA__;
+    render();
+    return;
+  }
   try {
     const r = await fetch('/api/data', { cache: 'no-store' });
     DATA = await r.json();
@@ -319,10 +325,24 @@ async function doSync() {
 
 $('btnSync').addEventListener('click', doSync);
 
+if (STATIC) {
+  $('btnSync').hidden = true;
+  document.querySelector('.sheet h3').textContent = '把看板加到主屏幕';
+  $('secPhone').textContent = '手机（不需要和电脑同一网络）';
+  $('ulPc').innerHTML =
+    '<li>把上面的网址存成书签，换任何一台电脑都能直接打开。</li>' +
+    '<li>这是生成那一刻的数据快照，想更新就在电脑上重新生成一次。</li>';
+  $('ulPhone').innerHTML =
+    '<li>Android Chrome：右上角 <b>⋮</b> → 「添加到主屏幕」。</li>' +
+    '<li>iPhone Safari：底部 <b>分享</b> → 「添加到主屏幕」。</li>' +
+    '<li>点开就是一张独立图标，和本地版长得一样。</li>';
+}
+
 const modal = $('modal');
 async function fillUrl() {
   const box = $('lanUrl');
-  box.value = location.origin;
+  box.value = STATIC ? location.href : location.origin;
+  if (STATIC) return;
   try {
     const info = await (await fetch('/api/lan')).json();
     const local = ['localhost', '127.0.0.1', '::1', '[::1]'];

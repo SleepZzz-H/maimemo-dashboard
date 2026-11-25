@@ -9,4 +9,4 @@ snapshot.lock
 node_modules/
 *.log
 preview*.png
-.edge-shot/
+.edge-shot/site/_shot*.png
