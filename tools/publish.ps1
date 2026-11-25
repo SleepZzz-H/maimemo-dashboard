@@ -30,6 +30,10 @@ if (-not $SkipSnapshot) {
   Step 1 '跳过抓取，直接用现有 state.json'
 }
 
+Step 1.5 '补齐新词的中文释义…'
+& node (Join-Path $Root 'tools\fetch-glosses.mjs') 2>&1 | Select-Object -Last 2
+if ($LASTEXITCODE -ne 0) { Write-Host '  释义补齐失败，先用现有释义继续。' -ForegroundColor Yellow }
+
 Step 2 '生成静态页面…'
 & node $Builder
 if ($LASTEXITCODE -ne 0) { throw "生成失败（退出码 $LASTEXITCODE）。" }
