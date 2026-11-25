@@ -46,10 +46,11 @@ try {
   if (-not $Message) { $Message = '更新看板数据 ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') }
   & git commit -q -m $Message
 
-  & git push origin main 2>$null
+  # 用 cmd 跑，避免 git 往 stderr 写进度时被 PowerShell 当成错误刷屏
+  & cmd /c 'git push origin main 2>nul'
   if ($LASTEXITCODE -ne 0) {
     Write-Host '  直连推送失败，改用本机代理重试…' -ForegroundColor Yellow
-    & git -c "http.proxy=$Proxy" push origin main
+    & cmd /c "git -c http.proxy=$Proxy push origin main 2>nul"
     if ($LASTEXITCODE -ne 0) { throw '推送失败：直连和代理都不行，检查网络后重跑本脚本（页面已经生成好了）。' }
   }
   Write-Host '  推送完成。' -ForegroundColor Green
